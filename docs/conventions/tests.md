@@ -1,0 +1,122 @@
+# Conventions: Tests
+
+Use **swift-testing** (the newer framework, `import Testing`, `@Test`, `#expect`), not XCTest. **Why:** swift-testing runs on the toolchain that ships with CommandLineTools — `swift test` works without a full Xcode.app install. XCTest requires the XCTest.framework that only ships with Xcode, which silently excludes contributors who don't have it installed.
+
+## Layout
+
+```
+Tests/
+└── RiverTests/
+    ├── RiverSessionTests.swift
+    ├── HotkeyManagerTests.swift
+    ├── TapStateMachineTests.swift
+    ├── SettingsStoreTests.swift
+    ├── AccessibilityCapabilityTests.swift
+    ├── MicrophoneCapabilityTests.swift
+    ├── InputMonitoringCapabilityTests.swift
+    └── ...
+```
+
+One test file per primary type under test. Suite names mirror the type:
+
+```swift
+import Testing
+@testable import River
+
+@Suite("RiverSession")
+struct RiverSessionTests {
+    @Test("activation while idle starts recording")
+    func activationWhileIdleStartsRecording() async throws {
+        // ...
+        #expect(session.currentState == .recording)
+    }
+}
+```
+
+## What is and isn't testable
+
+| Component | Testable? | How |
+|---|---|---|
+| `RiverSession` (cycle logic) | Yes, fully | Inject fakes for the four managers + a fake `SettingsStore`; drive synthetic activations; observe state publisher |
+| `TapStateMachine` | Yes | Pure state machine with injectable clock; feed synthetic key events |
+| `HotkeyManager` event interpretation | Yes | Synthesize `CGEvent`s, feed directly into internal helpers; uses a fake `InputMonitoringCapability` so no real tap is created |
+| `SettingsStore` | Yes | Inject `UserDefaults(suiteName:)`; assert publisher emissions; assert dedupe behavior |
+| `Capability` consumers (managers) | Yes | Inject fake capabilities; assert capability methods are called; assert typed errors propagate |
+| `Capability` implementations end-to-end | Partial | Inner logic is testable; the OS-call leaf cannot be exercised in CI (no TCC grant) |
+| `TranscriptionService` end-to-end | No | Requires WhisperKit model load, real audio, real Whisper run — not a unit test |
+| `TextInsertionManager` end-to-end | No | Requires a real Accessibility grant + a real target app for the paste to land |
+| `AudioCaptureManager` end-to-end | No | Requires Microphone grant and real audio input |
+
+**Architectural consequence:** the testable inner logic is now the majority of the codebase. `RiverSession` is fully unit-testable through fakes — the cycle (which used to be the bug-hiding wiring) is the test surface. Capability implementations have a small untestable OS-call leaf, but the consuming managers are fully testable against fake capabilities.
+
+## Access seams for tests
+
+Some methods are `internal` (not `private`) specifically so tests can exercise them without going through real OS APIs:
+
+- `HotkeyManager` event-interpretation helpers — internal for synthetic-event tests
+- `InputMonitoringCapability` event-decoding helpers — internal for synthetic-event tests
+- `TextInsertionManager.savePasteboard` / `restorePasteboard` — internal for round-trip tests
+
+Mark them clearly:
+
+```swift
+// internal for testability (CGEventTap cannot be created in CI)
+func decodeFlagsChanged(_ event: CGEvent) -> ActivationEdge? { ... }
+```
+
+**Do not promote these to `public`.** Internal is enough; public is an API contract.
+
+## Fake capabilities
+
+Each capability has a fake implementation for tests, conforming to the same protocol:
+
+```swift
+final class FakeAccessibilityCapability: AccessibilityCapability {
+    var statusValue: CapabilityStatus = .granted
+    var postedEvents: [CGEvent] = []
+    var shouldThrowOnPost: Error?
+
+    var status: AnyPublisher<CapabilityStatus, Never> { ... }
+
+    func postKeyEvent(_ event: CGEvent) throws {
+        if let error = shouldThrowOnPost { throw error }
+        postedEvents.append(event)
+    }
+    // ...
+}
+```
+
+Tests substitute these into managers and into `RiverSession` to exercise scenarios (capability denied, capability throws, capability grants late) without OS interaction.
+
+## Test isolation
+
+- Tests that touch `UserDefaults` directly must use a per-test suite name:
+  ```swift
+  let defaults = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+  defer { defaults.removePersistentDomain(forName: ...) }
+  ```
+  Most tests will use a fake `SettingsStore` instead and avoid `UserDefaults` entirely.
+- Tests must not depend on test execution order.
+- Tests must not require network, microphone, or accessibility permissions.
+
+## Running
+
+```bash
+swift test                                       # all tests
+swift test --filter RiverSessionTests        # one suite
+swift test --filter "activation while idle"      # one test
+```
+
+If a test requires a permission or external resource and can't be made hermetic, mark it `.disabled` with a reason and document the gap in `docs/planning/_index.md`:
+
+```swift
+@Test(.disabled("requires accessibility grant; run manually before release"))
+func endToEndPaste() { ... }
+```
+
+## Related
+
+- [swift-style.md](swift-style.md) — the access-control rules that enable test seams
+- [../architecture/river-session.md](../architecture/river-session.md) — the session is the primary integration test surface
+- [../architecture/capabilities.md](../architecture/capabilities.md) — the capability layer that makes managers testable against fakes
+- [../architecture/threading-invariant.md](../architecture/threading-invariant.md) — why the real event tap is integration-tested via synthetic events, not unit-tested
