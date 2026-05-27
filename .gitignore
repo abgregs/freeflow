@@ -1,0 +1,8 @@
+.build/
+.swiftpm/
+.DS_Store
+*.xcodeproj
+River.app/
+build/
+xcuserdata/
+Package.resolved
