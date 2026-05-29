@@ -1,32 +1,214 @@
+import AVFoundation
+import Combine
+import IOKit.hid
 import Testing
 @testable import FreeFlow
 
-@Suite("Capabilities")
-struct CapabilityTests {
+/// Test double for protocol-contract, reactivity, and gate tests. Lets a test
+/// set status without touching the host machine's real TCC grants, so the suite
+/// is deterministic on any machine (per docs/conventions/tests.md).
+@MainActor
+final class FakeCapability: Capability {
+    let displayName: String
+    let setupInstructions: String?
+    private let subject: CurrentValueSubject<CapabilityStatus, Never>
+
+    private(set) var requestGrantCount = 0
+    private(set) var recheckCount = 0
+    private(set) var openSystemSettingsCount = 0
+
+    init(displayName: String = "Fake", setupInstructions: String? = nil, status: CapabilityStatus = .denied) {
+        self.displayName = displayName
+        self.setupInstructions = setupInstructions
+        self.subject = CurrentValueSubject(status)
+    }
+
+    var status: AnyPublisher<CapabilityStatus, Never> { subject.eraseToAnyPublisher() }
+    var currentStatus: CapabilityStatus { subject.value }
+
+    func set(_ status: CapabilityStatus) { subject.send(status) }
+
+    func recheck() async { recheckCount += 1 }
+    func requestGrant() async { requestGrantCount += 1 }
+    func openSystemSettings() { openSystemSettingsCount += 1 }
+}
+
+@Suite("Capability protocol contract")
+struct CapabilityProtocolTests {
     @MainActor
-    @Test("AccessibilityCapability reports .unknown after init and recheck")
-    func accessibilityUnknown() async throws {
-        let capability = AccessibilityCapability()
-        #expect(capability.currentStatus == .unknown)
-        await capability.recheck()
-        #expect(capability.currentStatus == .unknown)
+    @Test("default requestGrant() routes to openSystemSettings()")
+    func defaultRequestGrantOpensSettings() async {
+        // The default Grant action for a non-auto-promptable permission must be
+        // "open System Settings" — that is the only path a self-signed build has.
+        final class DefaultGrantCapability: Capability {
+            let displayName = "Default"
+            let subject = CurrentValueSubject<CapabilityStatus, Never>(.denied)
+            var status: AnyPublisher<CapabilityStatus, Never> { subject.eraseToAnyPublisher() }
+            var currentStatus: CapabilityStatus { subject.value }
+            private(set) var openedSettings = false
+            func recheck() async {}
+            func openSystemSettings() { openedSettings = true }
+        }
+        let capability = DefaultGrantCapability()
+        await capability.requestGrant()
+        #expect(capability.openedSettings)
     }
 
     @MainActor
-    @Test("MicrophoneCapability reports .unknown after init and recheck")
-    func microphoneUnknown() async throws {
-        let capability = MicrophoneCapability()
-        #expect(capability.currentStatus == .unknown)
-        await capability.recheck()
-        #expect(capability.currentStatus == .unknown)
+    @Test("setupInstructions defaults to nil when unspecified")
+    func setupInstructionsDefaultsNil() {
+        // Auto-promptable capabilities (Microphone) carry no manual instructions;
+        // the default must be nil so the onboarding row hides the instruction text.
+        final class BareCapability: Capability {
+            let displayName = "Bare"
+            let subject = CurrentValueSubject<CapabilityStatus, Never>(.denied)
+            var status: AnyPublisher<CapabilityStatus, Never> { subject.eraseToAnyPublisher() }
+            var currentStatus: CapabilityStatus { subject.value }
+            func recheck() async {}
+            func openSystemSettings() {}
+        }
+        #expect(BareCapability().setupInstructions == nil)
+    }
+}
+
+@Suite("Capability status publisher")
+struct CapabilityPublisherTests {
+    @MainActor
+    @Test("status publisher replays current value then emits on change")
+    func publisherReplaysThenEmits() {
+        // OnboardingView relies on the publisher firing for live status updates;
+        // a publisher that never emits would freeze the UI on the launch value.
+        let capability = FakeCapability(status: .denied)
+        var received: [CapabilityStatus] = []
+        let token = capability.status.sink { received.append($0) }
+        capability.set(.granted)
+        token.cancel()
+        #expect(received == [.denied, .granted])
+    }
+}
+
+@Suite("Onboarding gate")
+struct OnboardingGateTests {
+    @MainActor
+    @Test("gate opens when any capability is denied")
+    func opensWhenAnyDenied() {
+        let caps: [any Capability] = [
+            FakeCapability(status: .granted),
+            FakeCapability(status: .denied),
+            FakeCapability(status: .granted)
+        ]
+        #expect(OnboardingGate.shouldPresent(for: caps))
     }
 
     @MainActor
-    @Test("InputMonitoringCapability reports .unknown after init and recheck")
-    func inputMonitoringUnknown() async throws {
-        let capability = InputMonitoringCapability()
-        #expect(capability.currentStatus == .unknown)
-        await capability.recheck()
-        #expect(capability.currentStatus == .unknown)
+    @Test("gate opens when any capability is unknown")
+    func opensWhenAnyUnknown() {
+        // .unknown is not .granted, so an unconfirmable grant must still open
+        // onboarding rather than silently passing as good.
+        let caps: [any Capability] = [
+            FakeCapability(status: .granted),
+            FakeCapability(status: .unknown)
+        ]
+        #expect(OnboardingGate.shouldPresent(for: caps))
+    }
+
+    @MainActor
+    @Test("gate stays closed only when every capability is granted")
+    func closedWhenAllGranted() {
+        let caps: [any Capability] = [
+            FakeCapability(status: .granted),
+            FakeCapability(status: .granted),
+            FakeCapability(status: .granted)
+        ]
+        #expect(!OnboardingGate.shouldPresent(for: caps))
+    }
+
+    @MainActor
+    @Test("gate re-evaluates after a denied capability becomes granted")
+    func reevaluatesAfterGrant() {
+        // Encodes the Refresh/Grant flow: once the last permission is granted,
+        // the gate must report the user is done.
+        let last = FakeCapability(status: .denied)
+        let caps: [any Capability] = [FakeCapability(status: .granted), last]
+        #expect(OnboardingGate.shouldPresent(for: caps))
+        last.set(.granted)
+        #expect(!OnboardingGate.shouldPresent(for: caps))
+    }
+}
+
+@Suite("Capability status mapping")
+struct CapabilityStatusMappingTests {
+    // Lock the honest mappings so a regression — lowering a not-determined or
+    // unconfirmable state to .granted, or a promptable state to a hard .denied —
+    // fails the suite. These are pure functions, fully deterministic, and are the
+    // structural guard behind capabilities.md "no lying".
+
+    @MainActor
+    @Test("Accessibility: trusted -> granted, untrusted -> denied")
+    func accessibilityMapping() {
+        #expect(AccessibilityCapability.map(isTrusted: true) == .granted)
+        #expect(AccessibilityCapability.map(isTrusted: false) == .denied)
+    }
+
+    @MainActor
+    @Test("Microphone: authorized -> granted, denied/restricted -> denied, notDetermined -> unknown")
+    func microphoneMapping() {
+        #expect(MicrophoneCapability.map(.authorized) == .granted)
+        #expect(MicrophoneCapability.map(.denied) == .denied)
+        #expect(MicrophoneCapability.map(.restricted) == .denied)
+        #expect(MicrophoneCapability.map(.notDetermined) == .unknown)
+    }
+
+    @MainActor
+    @Test("Input Monitoring: granted/denied/unknown map 1:1 — never a lie")
+    func inputMonitoringMapping() {
+        #expect(InputMonitoringCapability.map(kIOHIDAccessTypeGranted) == .granted)
+        #expect(InputMonitoringCapability.map(kIOHIDAccessTypeDenied) == .denied)
+        #expect(InputMonitoringCapability.map(kIOHIDAccessTypeUnknown) == .unknown)
+    }
+}
+
+@Suite("Real capability contract")
+struct RealCapabilityContractTests {
+    // These assert host-independent contract properties only. The OS-call leaf
+    // (real TCC status) cannot be exercised in CI without a grant, so it is not
+    // asserted here (per docs/conventions/tests.md).
+
+    @MainActor
+    @Test("Accessibility and Input Monitoring expose manual setup instructions")
+    func manualCapabilitiesHaveInstructions() {
+        #expect(AccessibilityCapability().setupInstructions != nil)
+        #expect(InputMonitoringCapability().setupInstructions != nil)
+    }
+
+    @MainActor
+    @Test("Microphone has no manual instructions because it auto-prompts")
+    func microphoneHasNoInstructions() {
+        #expect(MicrophoneCapability().setupInstructions == nil)
+    }
+
+    @MainActor
+    @Test("display names match the System Settings panes the user must visit")
+    func displayNames() {
+        #expect(AccessibilityCapability().displayName == "Accessibility")
+        #expect(MicrophoneCapability().displayName == "Microphone")
+        #expect(InputMonitoringCapability().displayName == "Input Monitoring")
+    }
+
+    @MainActor
+    @Test("real capabilities never report a status outside the honest enum")
+    func statusIsAlwaysAValidCase() async {
+        // Guards against a future regression that returns an out-of-band value;
+        // recheck must always settle on one of granted/denied/unknown.
+        let caps: [any Capability] = [
+            AccessibilityCapability(),
+            MicrophoneCapability(),
+            InputMonitoringCapability()
+        ]
+        for capability in caps {
+            await capability.recheck()
+            let status = capability.currentStatus
+            #expect(status == .granted || status == .denied || status == .unknown)
+        }
     }
 }
