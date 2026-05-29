@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             do { try await session.start() }
             catch { logger.error("Failed to start session: \(error.localizedDescription)") }
+            for capability in capabilities { await capability.recheck() }
             presentOnboardingIfNeeded()
         }
     }
@@ -43,19 +44,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func presentOnboardingIfNeeded() {
-        guard capabilities.contains(where: { $0.currentStatus != .granted }) else { return }
+        guard OnboardingGate.shouldPresent(for: capabilities) else { return }
+        presentOnboardingWindow()
+    }
+
+    private func presentOnboardingWindow() {
+        if let existing = onboardingWindow {
+            activate(existing)
+            return
+        }
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 420),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = "Welcome to Free Flow"
-        window.contentViewController = NSHostingController(rootView: OnboardingView(capabilities: capabilities))
+        window.contentViewController = NSHostingController(
+            rootView: OnboardingView(capabilities: capabilities) { [weak self] in
+                self?.dismissOnboarding()
+            }
+        )
         window.center()
         window.isReleasedWhenClosed = false
         onboardingWindow = window
+        activate(window)
+    }
+
+    /// `LSUIElement` apps stay `.accessory` (no Dock icon). An accessory app can
+    /// still key a window — flipping to `.regular` is unnecessary and adds a
+    /// transient Dock icon. `ignoringOtherApps` + `orderFrontRegardless` is the
+    /// minimal reliable way to surface a window from `applicationDidFinishLaunching`.
+    private func activate(_ window: NSWindow) {
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+    }
+
+    private func dismissOnboarding() {
+        onboardingWindow?.close()
+        onboardingWindow = nil
     }
 }
