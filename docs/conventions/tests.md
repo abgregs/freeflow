@@ -11,13 +11,11 @@ Tests/
     ├── HotkeyManagerTests.swift
     ├── TapStateMachineTests.swift
     ├── SettingsStoreTests.swift
-    ├── AccessibilityCapabilityTests.swift
-    ├── MicrophoneCapabilityTests.swift
-    ├── InputMonitoringCapabilityTests.swift
+    ├── CapabilityTests.swift        # the capability layer, grouped (see below)
     └── ...
 ```
 
-One test file per primary type under test. Suite names mirror the type:
+One test file per primary type under test, with one exception: the **capability layer is grouped into `CapabilityTests.swift`**, whose `@Suite`s span the `Capability` protocol, `OnboardingGate`, and the three capability implementations. Their per-type surfaces are small and share one `FakeCapability`, so a single file is clearer than five near-empty ones. Suite names mirror the type or concern:
 
 ```swift
 import Testing
@@ -56,6 +54,7 @@ Some methods are `internal` (not `private`) specifically so tests can exercise t
 - `HotkeyManager` event-interpretation helpers — internal for synthetic-event tests
 - `InputMonitoringCapability` event-decoding helpers — internal for synthetic-event tests
 - `TextInsertionManager.savePasteboard` / `restorePasteboard` — internal for round-trip tests
+- `*Capability.map(...)` — the pure status-mapping functions, internal so tests pin the granted/denied/unknown mapping without a real TCC grant
 
 Mark them clearly:
 
@@ -68,25 +67,32 @@ func decodeFlagsChanged(_ event: CGEvent) -> ActivationEdge? { ... }
 
 ## Fake capabilities
 
-Each capability has a fake implementation for tests, conforming to the same protocol:
+Capabilities are `final` and own real OS calls, so fakes conform to the `Capability` **protocol** rather than subclassing a concrete type. A single `FakeCapability` covers status, onboarding, and gate tests:
 
 ```swift
-final class FakeAccessibilityCapability: AccessibilityCapability {
-    var statusValue: CapabilityStatus = .granted
-    var postedEvents: [CGEvent] = []
-    var shouldThrowOnPost: Error?
+@MainActor
+final class FakeCapability: Capability {
+    let displayName: String
+    let setupInstructions: String?
+    private let subject: CurrentValueSubject<CapabilityStatus, Never>
+    private(set) var requestGrantCount = 0
 
-    var status: AnyPublisher<CapabilityStatus, Never> { ... }
-
-    func postKeyEvent(_ event: CGEvent) throws {
-        if let error = shouldThrowOnPost { throw error }
-        postedEvents.append(event)
+    init(displayName: String = "Fake", setupInstructions: String? = nil, status: CapabilityStatus = .denied) {
+        self.displayName = displayName
+        self.setupInstructions = setupInstructions
+        self.subject = CurrentValueSubject(status)
     }
-    // ...
+
+    var status: AnyPublisher<CapabilityStatus, Never> { subject.eraseToAnyPublisher() }
+    var currentStatus: CapabilityStatus { subject.value }
+    func set(_ status: CapabilityStatus) { subject.send(status) }   // drive transitions in tests
+    func recheck() async {}
+    func requestGrant() async { requestGrantCount += 1 }
+    func openSystemSettings() {}
 }
 ```
 
-Tests substitute these into managers and into `FreeFlowSession` to exercise scenarios (capability denied, capability throws, capability grants late) without OS interaction.
+Tests substitute these into `OnboardingGate`, managers, and `FreeFlowSession` to exercise scenarios (denied, unknown, grants late) without OS interaction. An action-specific manager test can use a purpose-built protocol-conforming fake that records calls (e.g. posted events for `TextInsertionManager`).
 
 ## Test isolation
 

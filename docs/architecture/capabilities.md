@@ -29,11 +29,18 @@ enum CapabilityStatus: Equatable {
 @MainActor
 protocol Capability: AnyObject {
     var displayName: String { get }                      // "Accessibility"
+    var setupInstructions: String? { get }               // manual-grant steps; nil when auto-promptable
     var status: AnyPublisher<CapabilityStatus, Never> { get }
     var currentStatus: CapabilityStatus { get }          // sync accessor for tests + AppKit gates
-    func recheck() async                                  // re-query TCC / try the action
+    func recheck() async                                  // re-query the status API
+    func requestGrant() async                             // Grant button action (see default below)
     func openSystemSettings()                             // for capabilities that can't auto-prompt
 }
+
+// Default extension: `setupInstructions` is `nil` and `requestGrant()` calls
+// `openSystemSettings()`. Microphone overrides `requestGrant()` to fire the TCC
+// auto-prompt (`AVCaptureDevice.requestAccess`); Accessibility and Input
+// Monitoring use the default (deep-link to System Settings for a manual add).
 ```
 
 Each capability also exposes the specific action it gates as a typed method. For example:
@@ -51,11 +58,23 @@ final class AccessibilityCapability: Capability {
 
 **Only `AccessibilityCapability` calls `CGEvent.post`. Only `MicrophoneCapability` starts the audio engine. Only `InputMonitoringCapability` creates the tap.** This is the load-bearing invariant.
 
+## Status detection
+
+Each capability's `recheck()` queries the most authoritative *non-prompting* status API for its permission and maps the result to `CapabilityStatus`:
+
+| Capability | Status API | Mapping |
+|---|---|---|
+| `MicrophoneCapability` | `AVCaptureDevice.authorizationStatus(for: .audio)` | `.authorized → .granted`; `.denied`/`.restricted → .denied`; `.notDetermined → .unknown` |
+| `AccessibilityCapability` | `AXIsProcessTrusted()` | authoritative `Bool` → `.granted` / `.denied` |
+| `InputMonitoringCapability` | `IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)` | true tri-state → `.granted` / `.denied` / `.unknown`, 1:1 |
+
+The mapping functions are `static` and `internal` so tests pin them deterministically without a real TCC grant (see [../conventions/tests.md](../conventions/tests.md)). Input Monitoring deliberately does **not** probe by creating a throwaway `CGEventTap`: that would call `CGEvent.tapCreate` on the main run loop and violate the [threading invariant](threading-invariant.md). The synthesized-action probe described in *Self-detection* below is the **M7 Accessibility bundle-misidentification detector** — a separate concern from status detection.
+
 ## Why "no lying"
 
 A `Capability.status` of `.unknown` is the structural answer to "I'm not sure if Accessibility is really granted." It is never lowered to `.granted` by checking a different permission. **Why:** the previous-generation design's `checkAccessibility()` fell back to `checkInputMonitoring()` when the AX check was unreliable for unsigned dev builds. The result: onboarding showed a green checkmark for Accessibility while the actual paste action silently failed. The single hardest bug to diagnose in this app's lineage. `.unknown` makes the gap visible.
 
-When `.unknown` is the answer, the capability exposes a `recheck()` that performs the most authoritative check available (typically attempting the gated action with a synthesized no-op) and updates `status`. UI shows `.unknown` distinctly from `.denied` — usually as an inline note: "Couldn't confirm grant. Try the feature, or open System Settings."
+When `.unknown` is the answer, the capability's `recheck()` re-queries the most authoritative status API available (see *Status detection* above) and updates `status`. UI shows `.unknown` distinctly from `.denied` — usually as an inline note: "Couldn't confirm grant. Try the feature, or open System Settings."
 
 ## How managers consume capabilities
 
@@ -80,7 +99,7 @@ Same pattern for `HotkeyManager` ↔ `InputMonitoringCapability` (the capability
 
 ## Onboarding consumes the capability set
 
-`OnboardingView` does not know about specific capabilities. It iterates `[any Capability]` and renders a row per capability with name, status (from the publisher), and a `Grant` button that either triggers the auto-prompt (Microphone) or opens System Settings (Accessibility, Input Monitoring). The window opens whenever **any** capability's status is not `.granted`.
+`OnboardingView` does not know about specific capabilities. It iterates `[any Capability]` and renders a row per capability with name, status (from the publisher), and a `Grant` button that calls `requestGrant()` — which triggers the auto-prompt (Microphone) or opens System Settings (Accessibility, Input Monitoring). The window opens whenever **any** capability's status is not `.granted`. The gate predicate is `OnboardingGate.shouldPresent(for:)` and the privacy-pane deep links live in one place as `SystemSettingsPane`.
 
 **Why:** any new permission added in the future just registers a new capability. Onboarding gets the new row for free. The "onboarding only fires on tap failure" failure mode is structurally impossible — the gating signal is "all capabilities granted," not "managers started successfully."
 

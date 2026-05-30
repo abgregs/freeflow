@@ -11,6 +11,7 @@ private let logger = Logger(subsystem: "com.freeflow.app", category: "app")
 Categories in use:
 
 - `app` — `AppDelegate` lifecycle, `FreeFlowSession` state transitions
+- `permissions` — `Capability` status checks and the onboarding grant flow
 - `hotkey` — `HotkeyManager` events, restart, tap status
 - `audio` — `AudioCaptureManager` start/stop, format
 - `transcribe` — `TranscriptionService` model load, transcription start/end

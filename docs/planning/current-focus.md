@@ -4,11 +4,13 @@ What's actively in flight. Update this when you start or finish a milestone.
 
 ## Status
 
-**M1 complete** (2026-05-26). The architectural skeleton is in place: Swift package, `FreeFlowApp` with `MenuBarExtra`, `AppDelegate` constructing `FreeFlowSession`, three stub `Capability` implementations (all return `.unknown`), `SettingsStore` with a placeholder key, and the bundle → sign → install pipeline. Build, test, install, launch, and quit all verified end-to-end with the locally signed `Free Flow Dev` identity.
+**M2 complete** (2026-05-29). The capability layer is real and onboarding works end-to-end. Each `Capability` reports honest `.granted`/`.denied`/`.unknown` from non-prompting status APIs (Microphone `AVCaptureDevice.authorizationStatus`, Accessibility `AXIsProcessTrusted()`, Input Monitoring `IOHIDCheckAccess` tri-state). `OnboardingView` iterates `[any Capability]` with working Grant/Refresh/Skip; the launch gate is `OnboardingGate.shouldPresent(for:)` ("any capability not granted"). New: `OnboardingGate`, `SystemSettingsPane`; the `Capability` protocol gained `setupInstructions` + `requestGrant()`. Verified: build + 18 tests green, and the full grant flow confirmed manually on a signed `/Applications` install.
+
+**M1 complete** (2026-05-26). Architectural skeleton (Swift package, `MenuBarExtra`, `FreeFlowSession`/`Capability`/`SettingsStore` stubs) plus the bundle → sign → install pipeline, verified end-to-end with the `Free Flow Dev` identity.
 
 ## Next up
 
-[M2: Capability layer + onboarding](milestones.md#m2-capability-layer--onboarding). Replace the `.unknown` returns in each `Capability` with real TCC checks. Wire `OnboardingView`'s per-capability rows with working `Grant` buttons (Microphone auto-prompts; Accessibility and Input Monitoring deep-link to System Settings). Run `/brief` before starting.
+[M3: FreeFlowSession skeleton](milestones.md#m3-freeflowsession-skeleton). Make `FreeFlowSession` own the `FreeFlowState` machine explicitly, hold the (still-stub) managers, and subscribe to `SettingsStore` publishers (even though real keys don't land until M8); shrink `AppDelegate` toward construct-and-start. Much of the scaffold already exists from M1. Run `/brief` before starting.
 
 ## Working agreement
 
