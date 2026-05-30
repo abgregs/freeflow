@@ -9,16 +9,20 @@ This doc covers what each permission means to the user and the rules around requ
 | Permission | Capability | What it enables | How macOS prompts | Failure mode if missing |
 |---|---|---|---|---|
 | **Microphone** | `MicrophoneCapability` | Audio capture (`AVAudioEngine.start()`) | Auto-prompts when `AVCaptureDevice.requestAccess` is called | Capability refuses; cycle aborts with a typed error |
-| **Input Monitoring** | `InputMonitoringCapability` | Creating the `CGEventTap` | Auto-prompts on first `CGEvent.tapCreate` | Capability refuses; activation key does nothing |
+| **Input Monitoring** | `InputMonitoringCapability` | Creating the `CGEventTap` | Status via `IOHIDCheckAccess` (no prompt); tap creation may prompt in M4 | Capability refuses; activation key does nothing |
 | **Accessibility** | `AccessibilityCapability` | Posting synthetic key events (`CGEvent.post`) | Programmatically requestable *once* via `AXIsProcessTrustedWithOptions`, then user-driven only | Capability refuses; recording works, but `insertText` throws and the cycle ends with a visible error |
 
 ## The Accessibility trap
 
 Two pitfalls specifically around Accessibility — both of which the architecture neutralizes:
 
-1. **`AXIsProcessTrustedWithOptions(... prompt: true)` fires its prompt at most once per app per machine.** If the user dismisses it, the app cannot re-prompt programmatically. `AccessibilityCapability.openSystemSettings()` is the fallback — it deep-links to the right pane and onboarding directs the user there with explicit instructions.
+1. **`AXIsProcessTrustedWithOptions(... prompt: true)` fires its prompt at most once per app per machine.** If the user dismisses it, the app cannot re-prompt programmatically — and for self-signed dev builds the cdhash changes every build, so the one-shot prompt is unreliable anyway. M2 therefore skips it: the `Grant` button calls `AccessibilityCapability.openSystemSettings()`, which deep-links to the right pane, and onboarding directs the user to add the app via **+** with explicit instructions. Status itself is read with the non-prompting `AXIsProcessTrusted()`.
 
 2. **Permission detection cannot lie.** Capabilities expose `CapabilityStatus` of `.granted` / `.denied` / `.unknown`. There is no fallback from one permission to another. The `.unknown` case exists explicitly for dev builds where TCC reporting is unreliable; it surfaces as an inline note in the UI, never as a green checkmark. See [capabilities.md](capabilities.md).
+
+## How M2 detects status
+
+Status is read with non-prompting APIs and never inferred from a different permission: Microphone via `AVCaptureDevice.authorizationStatus`, Accessibility via `AXIsProcessTrusted()`, Input Monitoring via `IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)` (a true granted/denied/unknown tri-state). Input Monitoring is **not** detected by creating a probe `CGEventTap` — that would breach the [threading invariant](threading-invariant.md). See [capabilities.md](capabilities.md#status-detection) for the full mapping table.
 
 ## Onboarding rules
 
