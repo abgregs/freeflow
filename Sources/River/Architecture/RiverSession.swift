@@ -17,6 +17,13 @@ final class RiverSession {
     private let settings: SettingsStore
 
     private var isStarted = false
+    private var cancellables = Set<AnyCancellable>()
+    private var pendingReconfiguration: (() -> Void)?
+
+    // internal for testability — tests assert subscription wiring through the
+    // counters rather than inspecting the handler closures.
+    private(set) var configurationApplyCount = 0
+    private(set) var configurationDeferCount = 0
 
     var state: AnyPublisher<RiverState, Never> { stateSubject.eraseToAnyPublisher() }
     var currentState: RiverState { stateSubject.value }
@@ -44,12 +51,34 @@ final class RiverSession {
     func start() async throws {
         guard !isStarted else { return }
         isStarted = true
+        subscribeToConfiguration()
         logger.info("RiverSession started")
     }
 
     func stop() async {
         guard isStarted else { return }
         isStarted = false
+        cancellables.removeAll()
         logger.info("RiverSession stopped")
+    }
+
+    // M1 placeholder subscription as the M8 wiring template — see configuration.md.
+    private func subscribeToConfiguration() {
+        settings.publisher(for: Settings.m1Placeholder)
+            .sink { [weak self] _ in
+                self?.applyOrDeferReconfiguration { /* placeholder has no consumer */ }
+            }
+            .store(in: &cancellables)
+    }
+
+    // Structural deferral — anti-pattern #7. Pending apply on return to idle lands in M8.
+    private func applyOrDeferReconfiguration(_ apply: @escaping () -> Void) {
+        if currentState == .idle {
+            apply()
+            configurationApplyCount += 1
+        } else {
+            pendingReconfiguration = apply
+            configurationDeferCount += 1
+        }
     }
 }
