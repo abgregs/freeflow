@@ -22,7 +22,7 @@ Exit criteria: launching the app yields a menu bar with state visible via `River
 
 ## M4: Hotkey detection (Hold mode)
 
-`InputMonitoringCapability` owns the real `CGEventTap` on `com.river.eventtap`. `HotkeyManager` consumes its event stream and fires semantic `onActivate` / `onDeactivate` callbacks. Default activation key Right Control, Hold mode only. `RiverSession` transitions to `.recording` / `.idle` in response.
+`InputMonitoringCapability` owns the real `CGEventTap` on `com.river.eventtap`. `HotkeyManager` consumes its event stream and fires semantic `onActivate` / `onDeactivate` callbacks. Default activation key Right Option (keycode 61 — universal on every Mac keyboard including MacBook and the compact Magic Keyboard); Hold mode only. `RiverSession` transitions to `.recording` / `.idle` in response.
 
 Exit criteria: holding Right Control transitions the session to `.recording`; releasing transitions back to `.idle`. Tested with synthetic events fed into `InputMonitoringCapability`'s internal helpers. Tap self-heals on `.tapDisabledByTimeout`.
 

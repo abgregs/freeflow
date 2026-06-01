@@ -95,7 +95,7 @@ These are decisions the walking skeleton makes that subsequent milestones inheri
 - **Composition direction**: `RiverApp` → `AppDelegate` → `RiverSession` → Managers → Capabilities → OS. No layer skips.
 - **Onboarding window presentation**: `AppDelegate` owns an `NSWindow` whose `contentViewController` is `NSHostingController(rootView: OnboardingView(...))`. **Why:** SwiftUI's `Window` scene does not auto-present in `LSUIElement = true` apps — declaring it does nothing until something calls `openWindow`. AppKit's `NSWindow.makeKeyAndOrderFront` is the only reliable trigger from `applicationDidFinishLaunching`. The gate is `capabilities.contains { $0.currentStatus != .granted }`.
 - **Settings window presentation**: opened via `@Environment(\.openSettings)` (macOS 14+) from a SwiftUI view inside `MenuBarExtra`. **Why:** the legacy `NSApp.sendAction(Selector("showSettingsWindow:"), to: nil, from: nil)` selector silently no-ops for `LSUIElement` apps. The environment value is the supported path.
-- **`Settings.m1Placeholder`**: a single throwaway `SettingKey<Int>` declared on the `Settings` namespace so the M1 round-trip test has something to exercise. Remove in M8 when real settings keys land.
+- **`Settings.m1Placeholder`**: a single throwaway `SettingKey<Int>` declared on the `Settings` namespace so the M1 round-trip test has something to exercise. Removed in M4 when `Settings.activationKeyCode` landed.
 
 ## Related
 

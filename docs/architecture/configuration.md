@@ -16,17 +16,19 @@ Two stores. Different responsibilities. Mixing them is the bug.
 
 Anything the user can change from Settings flows through [`SettingsStore`](settings-store.md). The store wraps `UserDefaults.standard` behind typed keys and per-key publishers.
 
-Current keys (declared on the `Settings` namespace, defaults sourced from `Constants`):
+Settings keys (the target set; declared progressively as their consumers land — see [planning/milestones.md](../planning/milestones.md)):
 
 | Key | Type | Default | Primary consumer |
 |---|---|---|---|
-| `activationKeyCode` | `Int` | `Constants.defaultActivationKeyCode` (62) | `RiverSession` → `HotkeyManager` |
+| `activationKeyCode` | `Int` | `Constants.defaultActivationKeyCode` (61, Right Option) | `RiverSession` → `HotkeyManager` |
 | `activationMode` | `ActivationMode` | `Constants.defaultActivationMode` (`.hold`) | `RiverSession` → `HotkeyManager` |
 | `doubleTapWindowMs` | `Int` | `400` | `HotkeyManager` (`TapStateMachine`) |
 | `customDictionaryTerms` | `[String]` | `Constants.defaultDictionaryTerms` | `TranscriptionService` |
 | `selectedModel` | `String` | `Constants.defaultModel` | `TranscriptionService` |
 | `launchAtLogin` | `Bool` | `false` | `SettingsView` → `SMAppService` |
 | `pauseMediaWhileDictating` | `Bool` | `true` | `MediaPauseManager` |
+
+As of M4, only `activationKeyCode` is declared; the others land with their consumers (custom dictionary + model picker in M6/M8; activation mode and double-tap window in M9; launch-at-login and media-pause in M8).
 
 SwiftUI binds via `@AppStorage` using the same key names (see [settings-store.md](settings-store.md) for the rule that prevents drift). Non-SwiftUI consumers read via `store.value(for:)` and observe via `store.publisher(for:)`.
 

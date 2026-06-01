@@ -33,6 +33,8 @@ The activation key is chosen from a fixed list of 10 modifier keys:
 
 Left and right variants share a flag-mask family; the implementation disambiguates by keycode, not by flag bit. See [../architecture/configuration.md](../architecture/configuration.md).
 
+Right Option is the default because it's present on every Mac keyboard (including MacBook and the compact Magic Keyboard, neither of which has a Right Control) and rarely pressed during typing, so Hold mode doesn't fire on capitalization or common shortcuts.
+
 Caps Lock + Hold is explicitly warned against in Settings UI. **Why:** macOS toggles the Caps Lock flag on press rather than reflecting held state, making Hold mode unreliable. Tap modes work fine with Caps Lock. See [supported-keys-and-limitations.md](supported-keys-and-limitations.md).
 
 ## Persistence

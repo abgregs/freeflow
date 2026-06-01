@@ -9,7 +9,7 @@ This doc covers what each permission means to the user and the rules around requ
 | Permission | Capability | What it enables | How macOS prompts | Failure mode if missing |
 |---|---|---|---|---|
 | **Microphone** | `MicrophoneCapability` | Audio capture (`AVAudioEngine.start()`) | Auto-prompts when `AVCaptureDevice.requestAccess` is called | Capability refuses; cycle aborts with a typed error |
-| **Input Monitoring** | `InputMonitoringCapability` | Creating the `CGEventTap` | Status via `IOHIDCheckAccess` (no prompt); tap creation may prompt in M4 | Capability refuses; activation key does nothing |
+| **Input Monitoring** | `InputMonitoringCapability` | Creating the `CGEventTap` | Status via `IOHIDCheckAccess` (no prompt); first `CGEvent.tapCreate` may prompt | Capability refuses; activation key does nothing |
 | **Accessibility** | `AccessibilityCapability` | Posting synthetic key events (`CGEvent.post`) | Programmatically requestable *once* via `AXIsProcessTrustedWithOptions`, then user-driven only | Capability refuses; recording works, but `insertText` throws and the cycle ends with a visible error |
 
 ## The Accessibility trap

@@ -51,8 +51,11 @@ struct RiverSessionTests {
 
 Some methods are `internal` (not `private`) specifically so tests can exercise them without going through real OS APIs:
 
-- `HotkeyManager` event-interpretation helpers — internal for synthetic-event tests
-- `InputMonitoringCapability` event-decoding helpers — internal for synthetic-event tests
+- `HotkeyManager.handle(_:)` / `bindEventStream()` — interpretation and Combine binding seams, exercised by feeding synthetic `TapEvent`s
+- `InputMonitoringCapability.decode(_:)` — pure `CGEvent` → `TapEvent` decoder, `nonisolated` so the C tap callback can call it without crossing an actor boundary
+- `InputMonitoringCapability.publishForTest(_:)` — pushes a synthetic `TapEvent` into the stream, bypassing the real tap (which requires an Input Monitoring grant on the running process)
+- `RiverSession.wireHotkeyCallbacks()` — wires `onActivate`/`onDeactivate` without starting the tap, so the chain can be tested end-to-end via `publishForTest`
+- `RiverSession.handleActivate()` / `handleDeactivate()` — state-guarded transitions; tests call them directly to verify that out-of-state events log and return
 - `TextInsertionManager.savePasteboard` / `restorePasteboard` — internal for round-trip tests
 - `*Capability.map(...)` — the pure status-mapping functions, internal so tests pin the granted/denied/unknown mapping without a real TCC grant
 - `RiverSession.configurationApplyCount` / `configurationDeferCount` — internal counters so tests can assert subscription wiring without reaching into the handler closures

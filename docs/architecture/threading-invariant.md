@@ -31,12 +31,14 @@ The same callback type also fires when the capability calls `CGEvent.tapEnable(.
 
 ## Reconfiguration
 
-When `RiverSession` triggers a reconfiguration (in response to a settings change), `HotkeyManager` asks `InputMonitoringCapability` to stop the current tap and start a new one with the new keycode of interest. The capability always:
+The tap is created once on the dedicated `com.river.eventtap` background thread and listens for `.flagsChanged` events across all modifier keys. Reconfiguration — e.g., the user changing the activation key in Settings — is handled by `HotkeyManager.setActivationKeyCode` updating the watched keycode and resetting its press latch (so a stale half-press of the old key can't fire a phantom deactivate). **Why no rebuild:** the tap's event mask doesn't depend on which key is watched; recreating it would be churn for no gain.
 
-1. Calls `CGEvent.tapEnable(... false)` on the current tap.
-2. Calls `CFRunLoopStop` on the current background run loop.
-3. Joins the thread.
-4. Spawns a fresh `Thread` with the same name and QoS for the new tap.
+If a future change ever does require a true tap rebuild (e.g., a different event-mask configuration), the capability is the only place that owns the lifecycle, and the procedure is:
+
+1. Call `CGEvent.tapEnable(... false)` on the current tap.
+2. Call `CFRunLoopStop` on the current background run loop.
+3. Join the thread.
+4. Spawn a fresh `Thread` with the same name and QoS for the new tap.
 
 There is no path that runs the new tap on the main loop, because there is no other place in the codebase that calls `CGEvent.tapCreate`.
 
