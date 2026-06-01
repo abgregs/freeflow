@@ -1,5 +1,6 @@
 import AVFoundation
 import Combine
+import CoreGraphics
 import IOKit.hid
 import Testing
 @testable import FreeFlow
@@ -210,5 +211,49 @@ struct RealCapabilityContractTests {
             let status = capability.currentStatus
             #expect(status == .granted || status == .denied || status == .unknown)
         }
+    }
+}
+
+@Suite("InputMonitoringCapability event decoding")
+struct InputMonitoringDecodeTests {
+    // The decode helper is the only CGEvent → TapEvent surface. Tests synthesize
+    // events here instead of through a real CGEventTap (no permission in CI).
+
+    @MainActor
+    @Test("flagsChanged event decodes to TapEvent.flagsChanged with keyCode and flags")
+    func decodesFlagsChanged() {
+        let event = CGEvent(source: nil)!
+        event.type = .flagsChanged
+        event.setIntegerValueField(.keyboardEventKeycode, value: 62)
+        event.flags = .maskControl
+
+        let decoded = InputMonitoringCapability.decode(event)
+        #expect(decoded == .flagsChanged(keyCode: 62, flags: .maskControl))
+    }
+
+    @MainActor
+    @Test("tapDisabledByTimeout decodes to .tapDisabled (self-heal signal)")
+    func decodesTapDisabledByTimeout() {
+        let event = CGEvent(source: nil)!
+        event.type = .tapDisabledByTimeout
+        #expect(InputMonitoringCapability.decode(event) == .tapDisabled)
+    }
+
+    @MainActor
+    @Test("tapDisabledByUserInput decodes to .tapDisabled")
+    func decodesTapDisabledByUserInput() {
+        let event = CGEvent(source: nil)!
+        event.type = .tapDisabledByUserInput
+        #expect(InputMonitoringCapability.decode(event) == .tapDisabled)
+    }
+
+    @MainActor
+    @Test("unrelated event types decode to nil")
+    func decodesUnrelatedAsNil() {
+        // Hold the tap surface tight: we listen on `.flagsChanged` only;
+        // anything else getting through would be a regression in the mask.
+        let event = CGEvent(source: nil)!
+        event.type = .keyDown
+        #expect(InputMonitoringCapability.decode(event) == nil)
     }
 }

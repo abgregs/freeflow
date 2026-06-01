@@ -6,12 +6,12 @@ import Testing
 @Suite("SettingsStore")
 struct SettingsStoreTests {
     @MainActor
-    @Test("round-trips a placeholder key with default")
+    @Test("round-trips activationKeyCode with default")
     func roundTripsWithDefault() async throws {
         let store = makeStore()
-        #expect(store.value(for: Settings.m1Placeholder) == Settings.m1Placeholder.defaultValue)
-        store.setValue(42, for: Settings.m1Placeholder)
-        #expect(store.value(for: Settings.m1Placeholder) == 42)
+        #expect(store.value(for: Settings.activationKeyCode) == Settings.activationKeyCode.defaultValue)
+        store.setValue(42, for: Settings.activationKeyCode)
+        #expect(store.value(for: Settings.activationKeyCode) == 42)
     }
 
     @MainActor
@@ -19,14 +19,14 @@ struct SettingsStoreTests {
     func publisherDedupes() async throws {
         let store = makeStore()
         var received: [Int] = []
-        let token = store.publisher(for: Settings.m1Placeholder).sink { received.append($0) }
+        let token = store.publisher(for: Settings.activationKeyCode).sink { received.append($0) }
         defer { token.cancel() }
 
-        store.setValue(7, for: Settings.m1Placeholder)
-        store.setValue(7, for: Settings.m1Placeholder)
-        store.setValue(9, for: Settings.m1Placeholder)
+        store.setValue(7, for: Settings.activationKeyCode)
+        store.setValue(7, for: Settings.activationKeyCode)
+        store.setValue(9, for: Settings.activationKeyCode)
 
-        #expect(received == [Settings.m1Placeholder.defaultValue, 7, 9])
+        #expect(received == [Settings.activationKeyCode.defaultValue, 7, 9])
     }
 
     @MainActor

@@ -7,7 +7,10 @@ struct SettingKey<Value> {
 }
 
 enum Settings {
-    static let m1Placeholder = SettingKey<Int>(name: "m1Placeholder", defaultValue: 0)
+    static let activationKeyCode = SettingKey<Int>(
+        name: "activationKeyCode",
+        defaultValue: Constants.defaultActivationKeyCode
+    )
 }
 
 @MainActor

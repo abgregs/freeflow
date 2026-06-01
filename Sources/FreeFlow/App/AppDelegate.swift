@@ -17,7 +17,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             accessibility: accessibility,
             microphone: microphone,
             inputMonitoring: inputMonitoring,
-            hotkey: HotkeyManager(inputMonitoring: inputMonitoring),
+            hotkey: HotkeyManager(
+                inputMonitoring: inputMonitoring,
+                initialKeyCode: settings.value(for: Settings.activationKeyCode)
+            ),
             audio: AudioCaptureManager(microphone: microphone),
             textInsertion: TextInsertionManager(accessibility: accessibility),
             transcription: TranscriptionService(),
