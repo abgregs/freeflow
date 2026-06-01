@@ -55,6 +55,7 @@ Some methods are `internal` (not `private`) specifically so tests can exercise t
 - `InputMonitoringCapability` event-decoding helpers — internal for synthetic-event tests
 - `TextInsertionManager.savePasteboard` / `restorePasteboard` — internal for round-trip tests
 - `*Capability.map(...)` — the pure status-mapping functions, internal so tests pin the granted/denied/unknown mapping without a real TCC grant
+- `RiverSession.configurationApplyCount` / `configurationDeferCount` — internal counters so tests can assert subscription wiring without reaching into the handler closures
 
 Mark them clearly:
 

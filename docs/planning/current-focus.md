@@ -4,13 +4,15 @@ What's actively in flight. Update this when you start or finish a milestone.
 
 ## Status
 
-**M2 complete** (2026-05-29). The capability layer is real and onboarding works end-to-end. Each `Capability` reports honest `.granted`/`.denied`/`.unknown` from non-prompting status APIs (Microphone `AVCaptureDevice.authorizationStatus`, Accessibility `AXIsProcessTrusted()`, Input Monitoring `IOHIDCheckAccess` tri-state). `OnboardingView` iterates `[any Capability]` with working Grant/Refresh/Skip; the launch gate is `OnboardingGate.shouldPresent(for:)` ("any capability not granted"). New: `OnboardingGate`, `SystemSettingsPane`; the `Capability` protocol gained `setupInstructions` + `requestGrant()`. Verified: build + 18 tests green, and the full grant flow confirmed manually on a signed `/Applications` install.
+**M3 complete** (2026-06-01). `RiverSession.start` subscribes to `SettingsStore` publishers via `subscribeToConfiguration()`; `applyOrDeferReconfiguration` applies directly when idle and parks the change in `pendingReconfiguration` otherwise (structural backing for anti-pattern #7). `stop` clears the subscription set. Internal counters (`configurationApplyCount` / `configurationDeferCount`) let tests assert wiring without inspecting closures. Verified: build + 22 tests green. No user-observable change — wiring stub for M8's real keys.
+
+**M2 complete** (2026-05-29). Capability layer real, onboarding end-to-end: honest `.granted`/`.denied`/`.unknown` from non-prompting status APIs (Microphone `AVCaptureDevice.authorizationStatus`, Accessibility `AXIsProcessTrusted()`, Input Monitoring `IOHIDCheckAccess` tri-state); `OnboardingView` iterates `[any Capability]` with Grant/Refresh/Skip; gate via `OnboardingGate.shouldPresent(for:)`. New: `OnboardingGate`, `SystemSettingsPane`; `Capability` gained `setupInstructions` + `requestGrant()`. Manually verified on a signed `/Applications` install.
 
 **M1 complete** (2026-05-26). Architectural skeleton (Swift package, `MenuBarExtra`, `RiverSession`/`Capability`/`SettingsStore` stubs) plus the bundle → sign → install pipeline, verified end-to-end with the `River Dev` identity.
 
 ## Next up
 
-[M3: RiverSession skeleton](milestones.md#m3-riversession-skeleton). Make `RiverSession` own the `RiverState` machine explicitly, hold the (still-stub) managers, and subscribe to `SettingsStore` publishers (even though real keys don't land until M8); shrink `AppDelegate` toward construct-and-start. Much of the scaffold already exists from M1. Run `/brief` before starting.
+[M4: Hotkey detection (Hold mode)](milestones.md#m4-hotkey-detection-hold-mode). `InputMonitoringCapability` gains the real `CGEventTap` on the dedicated `com.river.eventtap` background thread; `HotkeyManager` consumes the event stream and fires semantic `onActivate`/`onDeactivate` callbacks. Default key Right Control, Hold mode only. `RiverSession` transitions `.idle` ↔ `.recording` in response. The [threading invariant](../architecture/threading-invariant.md) is the central constraint. Run `/brief` before starting.
 
 ## Working agreement
 

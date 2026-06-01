@@ -70,7 +70,7 @@ When the user changes the activation key or mode in Settings:
 
 ## Testability
 
-The session is the test surface for the cycle. Tests construct a `RiverSession` with **fakes** for the four managers and a fake `SettingsStore`, then drive it with synthetic activations and observe the state publisher:
+The session is the test surface for the cycle. Tests construct a `RiverSession` with stubbed managers (replaced with fakes as each manager gains real behavior in M4–M7) and a `SettingsStore` backed by a per-test `UserDefaults` suite, then drive it with synthetic activations and observe the state publisher:
 
 ```swift
 @Test("activation during processing is ignored")
@@ -86,6 +86,8 @@ func activationDuringProcessingIsIgnored() async throws {
     #expect(session.currentState == .processing)
 }
 ```
+
+Configuration-subscription wiring is asserted indirectly through internal counters (`configurationApplyCount`, `configurationDeferCount`) — see [../conventions/tests.md](../conventions/tests.md) — so tests confirm the apply-or-defer branch without inspecting handler closures.
 
 End-to-end tests with real capabilities are integration tests run manually before release; the session's unit tests cover the cycle logic itself.
 
