@@ -20,9 +20,9 @@ The activation key is chosen from a fixed list of 10 modifier keys:
 
 | Key | Keycode | `CGEventFlags` mask |
 |---|---|---|
-| Right Control (default) | 62 | `.maskControl` |
+| Right Control | 62 | `.maskControl` |
 | Left Control | 59 | `.maskControl` |
-| Right Option | 61 | `.maskAlternate` |
+| Right Option (default) | 61 | `.maskAlternate` |
 | Left Option | 58 | `.maskAlternate` |
 | Right Command | 54 | `.maskCommand` |
 | Left Command | 55 | `.maskCommand` |
@@ -41,7 +41,7 @@ Declared as typed keys on the `Settings` namespace (backed by `UserDefaults.stan
 
 | Key | Type | Default |
 |---|---|---|
-| `Settings.activationKeyCode` | `Int` | `62` (Right Control) |
+| `Settings.activationKeyCode` | `Int` | `61` (Right Option) |
 | `Settings.activationMode` | `ActivationMode` | `.hold` |
 | `Settings.doubleTapWindowMs` | `Int` | `400` |
 
