@@ -69,11 +69,14 @@ final class FreeFlowSession {
     // real tap, so tests can drive the chain via `InputMonitoringCapability.publishForTest`.
     func wireHotkeyCallbacks() {
         hotkey.onActivate = { [weak self] in self?.handleActivate() }
-        hotkey.onDeactivate = { [weak self] in self?.handleDeactivate() }
+        hotkey.onDeactivate = { [weak self] in
+            Task { @MainActor in await self?.handleDeactivate() }
+        }
     }
 
     // internal for testability — state-guarded `.idle` → `.recording` transition.
-    // M5/M6 will start audio capture here; M4 is the wiring milestone.
+    // Audio capture is kicked off fire-and-forget so the state change is
+    // immediately observable; engine-warmup race is handled at stop time.
     func handleActivate() {
         guard currentState == .idle else {
             logger.info("Ignoring activate in state \(String(describing: self.currentState), privacy: .public)")
@@ -81,17 +84,40 @@ final class FreeFlowSession {
         }
         stateSubject.send(.recording)
         logger.info("State -> recording")
+        let audio = self.audio
+        Task { @MainActor in await audio.startRecording() }
     }
 
-    // internal for testability — state-guarded `.recording` → `.idle` transition.
-    // M5 will route through `.processing` (transcribe + paste); M4 returns to idle directly.
-    func handleDeactivate() {
+    // internal for testability — full cycle: `.recording` → `.processing` →
+    // capture/convert → `.idle`. Async so tests can `await` the complete cycle.
+    // M6 will replace the sample log with `TranscriptionService.transcribe`;
+    // M7 with paste-and-restore.
+    func handleDeactivate() async {
         guard currentState == .recording else {
             logger.info("Ignoring deactivate in state \(String(describing: self.currentState), privacy: .public)")
             return
         }
+        stateSubject.send(.processing)
+        logger.info("State -> processing")
+        do {
+            let samples = try await audio.stopRecording()
+            logger.info("Captured \(samples.count, privacy: .public) samples")
+        } catch {
+            logger.error("Audio capture failed: \(error.localizedDescription, privacy: .public)")
+        }
         stateSubject.send(.idle)
         logger.info("State -> idle")
+        applyPendingReconfiguration()
+    }
+
+    // Pending reconfigurations parked during a non-idle cycle fire on the
+    // return to `.idle` — closes the deferral loop documented in
+    // `architecture/free-flow-session.md` "Reconfiguration without leaks".
+    private func applyPendingReconfiguration() {
+        guard let apply = pendingReconfiguration else { return }
+        pendingReconfiguration = nil
+        apply()
+        configurationApplyCount += 1
     }
 
     // Subscribes to the activation publishers. Each subscription routes through
