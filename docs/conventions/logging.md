@@ -13,7 +13,7 @@ Categories in use:
 - `app` — `AppDelegate` lifecycle, `FreeFlowSession` state transitions
 - `permissions` — `Capability` status checks and the onboarding grant flow
 - `hotkey` — `HotkeyManager` events, restart, tap status
-- `audio` — `AudioCaptureManager` start/stop, format
+- `audio` — `MicrophoneCapability` engine start/stop + input format; `AudioCaptureManager` capture lifecycle, sample count, and conversion failures
 - `transcribe` — `TranscriptionService` model load, transcription start/end
 - `insert` — `TextInsertionManager` clipboard write/verify/restore
 

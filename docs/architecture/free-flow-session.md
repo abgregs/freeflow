@@ -89,6 +89,8 @@ func activationDuringProcessingIsIgnored() async throws {
 
 Configuration-subscription wiring is asserted indirectly through internal counters (`configurationApplyCount`, `configurationDeferCount`) — see [../conventions/tests.md](../conventions/tests.md) — so tests confirm the apply-or-defer branch without inspecting handler closures.
 
+`handleActivate` is sync (state changes immediately; audio start is fire-and-forget). `handleDeactivate` is async — tests `await` it directly to drive the full `.recording → .processing → .idle` cycle within the test's own timeline rather than waiting on the Task the production callback wraps it in.
+
 End-to-end tests with real capabilities are integration tests run manually before release; the session's unit tests cover the cycle logic itself.
 
 ## Related

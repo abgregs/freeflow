@@ -54,8 +54,11 @@ Some methods are `internal` (not `private`) specifically so tests can exercise t
 - `HotkeyManager.handle(_:)` / `bindEventStream()` — interpretation and Combine binding seams, exercised by feeding synthetic `TapEvent`s
 - `InputMonitoringCapability.decode(_:)` — pure `CGEvent` → `TapEvent` decoder, `nonisolated` so the C tap callback can call it without crossing an actor boundary
 - `InputMonitoringCapability.publishForTest(_:)` — pushes a synthetic `TapEvent` into the stream, bypassing the real tap (which requires an Input Monitoring grant on the running process)
+- `MicrophoneCapability.publishForTest(_:)` — pushes a synthetic `AVAudioPCMBuffer` into the stream, bypassing the real engine
+- `MicrophoneCapability.skipEngineForTesting` — flag that turns `startEngine()` into a no-op. Required because the test runner usually *does* have Microphone permission, so without it the real engine starts and silent audio races with `publishForTest` buffers (M4 got this for free because `tapCreate` returns nil without IM grant; mic capture has no natural skip)
+- `AudioCaptureManager.convert(_:from:toSampleRate:)` — pure buffer-list → 16 kHz `[Float]` conversion via `AVAudioConverter`, exercised on synthetic 44.1 kHz buffers
 - `FreeFlowSession.wireHotkeyCallbacks()` — wires `onActivate`/`onDeactivate` without starting the tap, so the chain can be tested end-to-end via `publishForTest`
-- `FreeFlowSession.handleActivate()` / `handleDeactivate()` — state-guarded transitions; tests call them directly to verify that out-of-state events log and return
+- `FreeFlowSession.handleActivate()` (sync) / `handleDeactivate()` (async) — state-guarded transitions; tests `await` `handleDeactivate` directly to drive the full `.recording → .processing → .idle` cycle on the test's own timeline, rather than waiting for the Task-wrapped callback the production wiring uses
 - `TextInsertionManager.savePasteboard` / `restorePasteboard` — internal for round-trip tests
 - `*Capability.map(...)` — the pure status-mapping functions, internal so tests pin the granted/denied/unknown mapping without a real TCC grant
 - `FreeFlowSession.configurationApplyCount` / `configurationDeferCount` — internal counters so tests can assert subscription wiring without reaching into the handler closures

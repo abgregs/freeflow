@@ -40,7 +40,7 @@ The cost is that the user's clipboard is briefly replaced. We mitigate by saving
 
 If `AccessibilityCapability.postKeyEvent` throws (status not `.granted`, or the silent-no-op detector fires), `TextInsertionManager` propagates the error to `FreeFlowSession`. The session logs at `.error`, updates `appState.errorMessage`, and returns to `.idle`. The user sees the error reflected in the UI; nothing fails silently.
 
-Same pattern for `MicrophoneCapability.startCapture` and any future capability — if the capability refuses, the cycle aborts cleanly.
+Audio capture follows the same pattern via `AudioCaptureError` (`.noAudioCaptured` when no buffer arrives in the 300 ms engine-warmup window; `.conversionFailed` when `AVAudioConverter` errors). `FreeFlowSession.handleDeactivate` catches both, logs at `.error`, and still returns to `.idle` — getting stuck in `.processing` would freeze the cycle. Note: `MicrophoneCapability.startEngine` itself does **not** throw (a failure to start logs a warning; the capability's `status` is the surface that signals "engine won't work" upstream to onboarding). The fail-loud surface is `stopRecording`, which is where "did we actually capture audio" becomes knowable.
 
 ## Related
 
