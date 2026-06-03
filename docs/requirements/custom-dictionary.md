@@ -11,7 +11,7 @@ The user can add terms to a custom dictionary that biases WhisperKit toward reco
 
 ## Storage
 
-`UserDefaults.standard` under key `customDictionaryTerms` as `[String]`. Default: a small starter list (e.g., common proper nouns relevant to the typical user); customizable per project at build time.
+`UserDefaults.standard` under key `customDictionaryTerms` as `[String]`. Default: empty as of M6 (`TranscriptionService.customDictionaryTerms = []`); the Settings UI to edit the list lands in M8, at which point a curated starter list can also be declared in `Constants.defaultDictionaryTerms`.
 
 ## How it reaches WhisperKit
 

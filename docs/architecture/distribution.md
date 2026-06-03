@@ -43,6 +43,12 @@ This is non-negotiable and documented in [../conventions/anti-patterns.md](../co
 
 Prefer using `xcodebuild` or `swift build` plus a tightly verified bundle-assembly step over a hand-rolled script. If a hand-rolled script is unavoidable, its first commit must include a check that `codesign -dv` on the output reports the expected bundle ID.
 
+## WhisperKit model cache
+
+First launch downloads the model identified by `Constants.defaultModel` (currently `openai_whisper-base.en`, ~140 MB) to WhisperKit's cache directory (`~/Documents/huggingface/models/argmaxinc/whisperkit-coreml/<model>`). Subsequent launches reuse the cached copy — only the first run sees the download cost.
+
+The sandbox is intentionally off (see [permissions.md](permissions.md)), so the cache lives outside the app container and survives reinstalls. This is the **only** network behaviour in the app (see [../requirements/core-feature.md](../requirements/core-feature.md) item 6).
+
 ## Releases
 
 - Tag a release: `git tag vX.Y.Z && git push origin vX.Y.Z`.

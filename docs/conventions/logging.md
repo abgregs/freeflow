@@ -14,7 +14,7 @@ Categories in use:
 - `permissions` — `Capability` status checks and the onboarding grant flow
 - `hotkey` — `HotkeyManager` events, restart, tap status
 - `audio` — `MicrophoneCapability` engine start/stop + input format; `AudioCaptureManager` capture lifecycle, sample count, and conversion failures
-- `transcribe` — `TranscriptionService` model load, transcription start/end
+- `transcribe` — `TranscriptionService`: WhisperKit model-load lifecycle (start / loaded / failed), transcribe start (sample count), end (transcribed char count). **Never** log the transcribed text itself — that's user content (anti-pattern #4)
 - `insert` — `TextInsertionManager` clipboard write/verify/restore
 
 Pick the category that matches where the code lives. Adding new categories is fine; reusing categories across files is fine when they share a concern.
