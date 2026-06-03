@@ -102,6 +102,13 @@ final class RiverSession {
         do {
             let samples = try await audio.stopRecording()
             logger.info("Captured \(samples.count, privacy: .public) samples")
+            do {
+                let text = try await transcription.transcribe(audioSamples: samples)
+                logger.info("Transcribed \(text.count, privacy: .public) chars")
+                // M7 will hand `text` to `textInsertion` here.
+            } catch {
+                logger.error("Transcription failed: \(error.localizedDescription, privacy: .public)")
+            }
         } catch {
             logger.error("Audio capture failed: \(error.localizedDescription, privacy: .public)")
         }

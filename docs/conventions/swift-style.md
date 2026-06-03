@@ -2,7 +2,7 @@
 
 ## Naming
 
-- **Types**: `UpperCamelCase`. Suffix managers with `Manager` only when they own significant state (e.g., `HotkeyManager`). Otherwise, prefer behavioral names (`TextInsertion`, not `TextInsertionManager`).
+- **Types**: `UpperCamelCase`. The cycle's state-owning collaborators under `Managers/` use the `Manager` suffix uniformly — `HotkeyManager`, `AudioCaptureManager`, `TextInsertionManager`, and `TranscriptionManager` (renaming `TranscriptionService` is tracked in [../planning/_index.md](../planning/_index.md)). Pure value types and stateless helpers use behavioral names without a suffix (e.g., `TapEvent`, `OnboardingGate`, `SystemSettingsPane`). **Why:** consistency across the `Managers/` folder beats per-name micro-optimization; the suffix signals "owns significant state and an OS/network surface" at a glance.
 - **Identifiers**: descriptive — no single-letter locals outside trivial closures, no abbreviations except universally understood ones (`url`, `id`, `db`).
 - **Booleans**: positive phrasing, predicate form. `isRecording`, `hasPendingRestart`, never `recordingFlag` or `notIdle`.
 - **Enums for state**: prefer explicit case names over booleans. `enum State { case idle, recording, processing }` not three `Bool`s.

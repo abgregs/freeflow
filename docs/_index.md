@@ -18,6 +18,9 @@ What the product is supposed to do: the core feature spec, the activation-key/mo
 ### [planning/](planning/_index.md)
 Active and future work: the walking-skeleton milestone, milestone roadmap, current focus.
 
+### [decisions/](decisions/_index.md)
+ADRs — load-bearing architectural decisions and the rationale for *not* taking specific refactors. Read before re-suggesting a known-deferred change.
+
 ## Conventions of these docs
 
 - Files are kebab-case, single-topic, max ~150 lines.

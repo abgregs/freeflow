@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let microphone = MicrophoneCapability()
     let inputMonitoring = InputMonitoringCapability()
     let settings = SettingsStore()
+    let transcription = TranscriptionService()
 
     private(set) lazy var session: RiverSession = {
         RiverSession(
@@ -23,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ),
             audio: AudioCaptureManager(microphone: microphone),
             textInsertion: TextInsertionManager(accessibility: accessibility),
-            transcription: TranscriptionService(),
+            transcription: transcription,
             settings: settings
         )
     }()
@@ -39,6 +40,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             catch { logger.error("Failed to start session: \(error.localizedDescription)") }
             for capability in capabilities { await capability.recheck() }
             presentOnboardingIfNeeded()
+        }
+        // Model load is fire-and-forget on its own schedule (per the architecture:
+        // "Default model loads on launch, not blocking the session"). First launch
+        // may download the model; subsequent launches use the cached copy.
+        Task { @MainActor in
+            try? await transcription.loadModel()
         }
     }
 

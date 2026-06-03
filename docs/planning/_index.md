@@ -16,3 +16,6 @@ These are tracked here until they're picked up into an active milestone or moved
 - **Settings UI for `doubleTapWindowMs`**: a slider for users who want to tune the double-tap window. Currently fixed at 400 ms.
 - **Settings UI for Fn key warning**: parallel to the existing Caps Lock + Hold warning.
 - **Mid-cycle settings change visual feedback**: when `pendingActivationRestart` is set, briefly show the user that their change will apply after the current recording.
+- **Rename `TranscriptionService` → `TranscriptionManager`**: align with the `Manager` suffix convention chosen for cycle collaborators (see [../conventions/swift-style.md](../conventions/swift-style.md)). Standalone PR — touch the type name, file name, and the AppDelegate/session construction sites.
+- **Extract `OnboardingCoordinator`**: AppDelegate currently owns the onboarding window's construction, activation policy, and dismissal alongside its construct-and-start role. Pull launch-UI orchestration into a coordinator so AppDelegate stays genuinely thin. Worth doing once another launch-UI concern lands (e.g., an M7 paste-error surface).
+- **Menu-bar visual state** ([../requirements/core-feature.md](../requirements/core-feature.md) item 5): the mic icon should reflect `.idle` / `.recording` / `.processing`. Implement after M7 so the full cycle is doing visible work end-to-end.
