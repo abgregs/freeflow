@@ -57,7 +57,7 @@ Some entries below are marked **structurally impossible** — the architecture m
 
 ## 7. Mid-cycle configuration restart — **structurally impossible**
 
-**The shape that was forbidden:** an external observer calls `HotkeyManager.restart()` while `appState.currentState != .idle`, tearing down the event tap mid-recording and dropping the audio buffer.
+**The shape that was forbidden:** an external observer calls `HotkeyManager.restart()` while `FreeFlowSession.currentState != .idle`, tearing down the event tap mid-recording and dropping the audio buffer.
 
 **Why this can't happen in the current design:** there is no public `restart` method exposed externally. [`FreeFlowSession`](../architecture/free-flow-session.md) is the only consumer of `SettingsStore` activation publishers; the session inspects its own state and either applies immediately (when idle) or defers (when not). Settings UI cannot reach past the session to trigger a restart. The deferral logic is internal to the session and cannot be skipped.
 
