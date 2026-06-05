@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let inputMonitoring = InputMonitoringCapability()
     let settings = SettingsStore()
     let transcription = TranscriptionService()
+    let appState = AppState()
 
     private(set) lazy var session: FreeFlowSession = {
         FreeFlowSession(
@@ -37,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Application did finish launching")
+        appState.bind(to: session)
         onboarding.start()
         Task { @MainActor in
             do { try await session.start() }

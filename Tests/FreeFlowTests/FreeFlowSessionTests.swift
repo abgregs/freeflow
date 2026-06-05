@@ -124,6 +124,29 @@ struct FreeFlowSessionTests {
     }
 
     @MainActor
+    @Test("handleDeactivate emits a cycle error and still returns to .idle when capture fails")
+    func emitsCycleErrorOnAudioFailure() async throws {
+        // Same no-buffer path as handleDeactivateReturnsToIdleOnAudioError, now
+        // also asserting the session-level error publisher surfaces the failure
+        // for the menu-bar renderer — and that the emission does not disturb the
+        // guaranteed return to .idle.
+        let env = makeSession()
+        var errors: [FreeFlowError] = []
+        let token = env.session.errors.sink { errors.append($0) }
+        defer { token.cancel() }
+
+        env.session.handleActivate()
+        await env.session.handleDeactivate()
+
+        #expect(env.session.currentState == .idle)
+        #expect(errors.count == 1)
+        guard case .audioCapture = errors.first else {
+            Issue.record("expected .audioCapture, got \(String(describing: errors.first))")
+            return
+        }
+    }
+
+    @MainActor
     @Test("pending reconfiguration applies on return to .idle")
     func pendingReconfigurationAppliesOnReturnToIdle() async throws {
         // The M3 deferral slot closes here: a settings change during a cycle is
