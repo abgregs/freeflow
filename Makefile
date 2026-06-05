@@ -7,27 +7,10 @@ INFO_PLIST := Sources/FreeFlow/Resources/Info.plist
 ENTITLEMENTS := Sources/FreeFlow/Resources/FreeFlow.entitlements
 INSTALL_DIR := /Applications
 
-# Verbose-log opt-in (`make DEBUG=true install`). When true, defines the
-# `DICTATION_VERBOSE_LOGS` swiftc flag so the source code can `#if`-guard
-# `privacy: .public` on selected logging calls (errors, sizes, state
-# transitions). See docs/conventions/logging.md.
-DEBUG ?= false
-ifeq ($(DEBUG),true)
-SWIFT_DEBUG_FLAGS := -Xswiftc -D -Xswiftc DICTATION_VERBOSE_LOGS
-else
-SWIFT_DEBUG_FLAGS :=
-endif
-
 .PHONY: build bundle sign verify install clean test
 
 build:
-ifeq ($(DEBUG),true)
-	@echo "⚠️  --debug true: building with verbose logs."
-	@echo "    Error messages and diagnostic counts will be visible in os_log output"
-	@echo "    (not redacted as <private>). User content like transcribed text remains private."
-	@echo "    Do NOT use this build for distribution."
-endif
-	swift build -c release --arch arm64 $(SWIFT_DEBUG_FLAGS)
+	swift build -c release --arch arm64
 
 bundle: build
 	rm -rf $(APP_BUNDLE)

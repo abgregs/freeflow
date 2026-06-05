@@ -40,11 +40,7 @@ final class TextInsertionManager {
             // to wait for, and we must not strand the transcription in the user's
             // clipboard. Then rethrow so `FreeFlowSession` can surface the error.
             restorePasteboard(snapshot)
-            #if DICTATION_VERBOSE_LOGS
-            logger.error("insertText: failed, pasteboard restored: \(error.localizedDescription, privacy: .public)")
-            #else
-            logger.error("insertText: failed, pasteboard restored: \(error.localizedDescription)")
-            #endif
+            logger.error("insertText: failed, pasteboard restored: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
             throw error
         }
     }

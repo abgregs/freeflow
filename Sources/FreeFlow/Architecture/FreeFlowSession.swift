@@ -109,13 +109,13 @@ final class FreeFlowSession {
                 do {
                     try await textInsertion.insertText(text)
                 } catch {
-                    logger.error("Text insertion failed: \(error.localizedDescription, privacy: .public)")
+                    logger.error("Text insertion failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
                 }
             } catch {
-                logger.error("Transcription failed: \(error.localizedDescription, privacy: .public)")
+                logger.error("Transcription failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
             }
         } catch {
-            logger.error("Audio capture failed: \(error.localizedDescription, privacy: .public)")
+            logger.error("Audio capture failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
         }
         stateSubject.send(.idle)
         logger.info("State -> idle")
