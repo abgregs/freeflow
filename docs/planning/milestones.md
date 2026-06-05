@@ -56,6 +56,12 @@ Exit criteria: every documented setting changes the app's behavior without resta
 
 Exit criteria: tests for state machine cover single-tap, double-tap within window, double-tap outside window, boundary, and stop-via-single-tap. End-to-end: all three modes work in Notes.
 
+## Focused-element paste guard
+
+Before posting the synthesized ⌘V, verify the system-wide focused element is a text-bearing AX role; skip the paste and signal "no text field focused" otherwise. A **read-only** AX role check — not the AX write path rejected in [../architecture/free-flow-pipeline.md](../architecture/free-flow-pipeline.md). Catches the "dictate into a non-editable target" case (e.g. a selected DOM node in browser dev tools) that today fires a stray paste indistinguishable from success. Sequenced after the Menu-bar visual-state milestone, whose session-level error surface it reuses. Detail: [0001_focused-element-paste-guard.md](0001_focused-element-paste-guard.md).
+
+Exit criteria: non-editable focus produces no paste, a visible signal, and an untouched clipboard; editable focus pastes as today; an ambiguous AX role fails open. Role classification is unit-tested off a role table.
+
 ## M10: Local-install distribution
 
 Makefile target that does `swift build -c release`, assembles the bundle (`Info.plist` + entitlements), installs to `/Applications`, and signs with the local "Free Flow Dev" identity. README documents the one-time keychain certificate setup. Bundle assembly is verified with `codesign -dv` before install completes.

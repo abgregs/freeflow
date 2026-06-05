@@ -22,6 +22,8 @@ What's actively in flight. Update this when you start or finish a milestone.
 
 **Menu-bar visual state** ([_index.md](_index.md) open items, [../requirements/core-feature.md](../requirements/core-feature.md) item 5). The mic icon should reflect `.idle` / `.recording` / `.processing` so the full cycle does visible work end-to-end. This milestone also brings the **session-level error publisher** that M7 deferred — the surface for transient `CGEvent.post` failures that are currently log-only, and for the silent-no-op probe's `.denied` downgrade once it's wired beyond re-opening onboarding. Run `/brief` before starting.
 
+**Then: Focused-element paste guard** ([0001_focused-element-paste-guard.md](0001_focused-element-paste-guard.md)). Once the menu-bar status surface exists, guard the synthesized paste against non-editable focus targets — the dev-tools-selection case where ⌘V fires into something that can't accept it and the miss is today indistinguishable from success. A read-only AX role check, not an AX write path. Sequenced here because it reuses the menu-bar milestone's session-level error surface.
+
 ## Working agreement
 
 - Before any non-trivial code change: run `/brief` to find applicable conventions.

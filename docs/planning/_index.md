@@ -5,6 +5,9 @@ Active and future work. Read this first when planning a new task; update it as w
 - [milestones.md](milestones.md) — ordered list of milestones from greenfield to public release
 - [walking-skeleton.md](walking-skeleton.md) — the first milestone in detail: a runnable menu bar app that does nothing useful
 - [current-focus.md](current-focus.md) — what's actively in flight right now; updated as work moves
+- [0001_focused-element-paste-guard.md](0001_focused-element-paste-guard.md) — detailed spec for a queued roadmap item: guard the paste against non-editable focus targets
+
+Detailed specs for individual roadmap items live in their own files (like [walking-skeleton.md](walking-skeleton.md) for M1). New queued items use an ordered `NNNN_` filename prefix (`0001_`, `0002_`, …) so they sort in execution order.
 
 ## Open items / TODOs
 
