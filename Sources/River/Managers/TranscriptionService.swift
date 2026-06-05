@@ -64,7 +64,7 @@ final class TranscriptionService {
             logger.info("WhisperKit model loaded")
         } catch {
             loadTask = nil
-            logger.error("WhisperKit load failed: \(error.localizedDescription, privacy: .public)")
+            logger.error("WhisperKit load failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
             throw error
         }
     }

@@ -83,7 +83,7 @@ final class MicrophoneCapability: Capability {
             audioLogger.info("AVAudioEngine started; input format \(format.sampleRate, privacy: .public) Hz \(format.channelCount, privacy: .public) ch")
         } catch {
             engine.inputNode.removeTap(onBus: 0)
-            audioLogger.warning("AVAudioEngine.start failed: \(error.localizedDescription, privacy: .public)")
+            audioLogger.warning("AVAudioEngine.start failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
         }
     }
 

@@ -40,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onboarding.start()
         Task { @MainActor in
             do { try await session.start() }
-            catch { logger.error("Failed to start session: \(error.localizedDescription)") }
+            catch { logger.error("Failed to start session: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)") }
             for capability in capabilities { await capability.recheck() }
             onboarding.presentIfNeeded()
         }
