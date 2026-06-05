@@ -2,10 +2,26 @@ import Combine
 import Foundation
 import os
 
+// Cycle-failure surface, one case per stage; redact the message before display (ADR 0002).
+enum RiverError: LocalizedError {
+    case audioCapture(underlying: Error)
+    case transcription(underlying: Error)
+    case textInsertion(underlying: Error)
+
+    var errorDescription: String? {
+        switch self {
+        case .audioCapture(let underlying): return "Couldn't capture audio: \(underlying.localizedDescription)"
+        case .transcription(let underlying): return "Couldn't transcribe: \(underlying.localizedDescription)"
+        case .textInsertion(let underlying): return "Couldn't paste: \(underlying.localizedDescription)"
+        }
+    }
+}
+
 @MainActor
 final class RiverSession {
     private let logger = Logger(subsystem: Constants.loggingSubsystem, category: "app")
     private let stateSubject = CurrentValueSubject<RiverState, Never>(.idle)
+    private let errorSubject = PassthroughSubject<RiverError, Never>()
 
     private let accessibility: AccessibilityCapability
     private let microphone: MicrophoneCapability
@@ -27,6 +43,9 @@ final class RiverSession {
 
     var state: AnyPublisher<RiverState, Never> { stateSubject.eraseToAnyPublisher() }
     var currentState: RiverState { stateSubject.value }
+    // The cycle-failure surface for the menu bar (and, later, the recording HUD
+    // — planning 0002). Lands with a renderer per river-pipeline.md.
+    var errors: AnyPublisher<RiverError, Never> { errorSubject.eraseToAnyPublisher() }
 
     init(
         accessibility: AccessibilityCapability,
@@ -110,12 +129,15 @@ final class RiverSession {
                     try await textInsertion.insertText(text)
                 } catch {
                     logger.error("Text insertion failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
+                    errorSubject.send(.textInsertion(underlying: error))
                 }
             } catch {
                 logger.error("Transcription failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
+                errorSubject.send(.transcription(underlying: error))
             }
         } catch {
             logger.error("Audio capture failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
+            errorSubject.send(.audioCapture(underlying: error))
         }
         stateSubject.send(.idle)
         logger.info("State -> idle")
