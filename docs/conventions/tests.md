@@ -61,6 +61,10 @@ Some methods are `internal` (not `private`) specifically so tests can exercise t
 - `FreeFlowSession.wireHotkeyCallbacks()` — wires `onActivate`/`onDeactivate` without starting the tap, so the chain can be tested end-to-end via `publishForTest`
 - `FreeFlowSession.handleActivate()` (sync) / `handleDeactivate()` (async) — state-guarded transitions; tests `await` `handleDeactivate` directly to drive the full `.recording → .processing → .idle` cycle on the test's own timeline, rather than waiting for the Task-wrapped callback the production wiring uses
 - `TextInsertionManager.savePasteboard` / `restorePasteboard` — internal for round-trip tests
+- `AccessibilityCapability.skipPostForTesting` — flag that short-circuits both the silent-no-op probe and the real `CGEvent.post`. Required because the test runner's trustedness leaks into the test process, so without it `postKeyEvent` would fire a real paste into whatever app was focused at test time (mirrors `MicrophoneCapability.skipEngineForTesting`)
+- `AccessibilityCapability.setStatusForTesting(_:)` — drives `status` (and the `probeConfirmed` cache) synchronously, bypassing `recheck()`'s non-deterministic host TCC read, so a test can lock the `postKeyEvent` gate open or closed
+- `AccessibilityCapability.postedEventCountForTesting` — counts the posts that `skipPostForTesting` suppressed, so manager tests assert the capability was asked to post the expected number of events without a real `CGEvent.post`
+- `AccessibilityCapability.probe()` — the pure Shift-modifier round-trip detector for the bundle-misidentification silent-no-op case, internal so the round-trip logic has a seam even though its OS-call leaf can't be exercised in CI
 - `*Capability.map(...)` — the pure status-mapping functions, internal so tests pin the granted/denied/unknown mapping without a real TCC grant
 - `FreeFlowSession.configurationApplyCount` / `configurationDeferCount` — internal counters so tests can assert subscription wiring without reaching into the handler closures
 
