@@ -89,9 +89,10 @@ final class FreeFlowSession {
     }
 
     // internal for testability — full cycle: `.recording` → `.processing` →
-    // capture/convert → `.idle`. Async so tests can `await` the complete cycle.
-    // M6 will replace the sample log with `TranscriptionService.transcribe`;
-    // M7 with paste-and-restore.
+    // capture/convert/transcribe/paste → `.idle`. Async so tests can `await`
+    // the complete cycle. Each step's failure is caught independently so the
+    // cycle always returns to `.idle` and pending reconfiguration applies;
+    // getting stuck in `.processing` would freeze the app (free-flow-pipeline.md).
     func handleDeactivate() async {
         guard currentState == .recording else {
             logger.info("Ignoring deactivate in state \(String(describing: self.currentState), privacy: .public)")
@@ -105,7 +106,11 @@ final class FreeFlowSession {
             do {
                 let text = try await transcription.transcribe(audioSamples: samples)
                 logger.info("Transcribed \(text.count, privacy: .public) chars")
-                // M7 will hand `text` to `textInsertion` here.
+                do {
+                    try await textInsertion.insertText(text)
+                } catch {
+                    logger.error("Text insertion failed: \(error.localizedDescription, privacy: .public)")
+                }
             } catch {
                 logger.error("Transcription failed: \(error.localizedDescription, privacy: .public)")
             }

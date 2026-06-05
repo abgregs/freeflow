@@ -147,6 +147,14 @@ struct FreeFlowSessionTests {
     }
 
     @MainActor
+    @Test(.disabled("end-to-end paste verification requires a loaded WhisperKit model + Accessibility grant — manual on-device before release. The insertion-catch branch in handleDeactivate is structurally identical to the transcription-catch (which is already covered by handleDeactivateReturnsToIdleOnAudioError indirectly) — reaching it in a unit test would require injecting a success-path TranscriptionService fake, which ADR 0001 defers until a second adapter shows up."))
+    func endToEndPasteCycle() async throws {
+        // Placeholder lives here so the gap is locatable in the suite, not
+        // hidden in a doc. If this comment grows to a third bullet, the ADR
+        // revisit trigger has fired — extract a TranscriptionService protocol.
+    }
+
+    @MainActor
     @Test("handleActivate is a no-op outside .idle")
     func handleActivateRejectsNonIdle() {
         let env = makeSession()
