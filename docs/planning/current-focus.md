@@ -24,6 +24,8 @@ What's actively in flight. Update this when you start or finish a milestone.
 
 **Then: Focused-element paste guard** ([0001_focused-element-paste-guard.md](0001_focused-element-paste-guard.md)). Once the menu-bar status surface exists, guard the synthesized paste against non-editable focus targets — the dev-tools-selection case where ⌘V fires into something that can't accept it and the miss is today indistinguishable from success. A read-only AX role check, not an AX write path. Sequenced here because it reuses the menu-bar milestone's session-level error surface.
 
+**Also queued: Recording indicator HUD** ([0002_recording-indicator-hud.md](0002_recording-indicator-hud.md)). A floating, fixed-position, non-activating "recording…" toast that observes the same `FreeFlowState` seam — mode-agnostic (identical for Hold / tap modes), deferred but captured. Depends on the menu-bar milestone's state seam; orderable independently of the paste guard.
+
 ## Working agreement
 
 - Before any non-trivial code change: run `/brief` to find applicable conventions.

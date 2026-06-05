@@ -62,6 +62,12 @@ Before posting the synthesized ⌘V, verify the system-wide focused element is a
 
 Exit criteria: non-editable focus produces no paste, a visible signal, and an untouched clipboard; editable focus pastes as today; an ambiguous AX role fails open. Role classification is unit-tested off a role table.
 
+## Recording indicator HUD
+
+A floating, **fixed-position, non-activating** status indicator (a "toast") that shows `.recording` / `.processing` where the user's attention is, fading out on `.idle`. **Mode-agnostic** — identical for Hold / Single Tap / Double Tap, because it observes `FreeFlowState`, not the hotkey mode. Load-bearing constraint: the panel must **never take key focus** (it appears mid-recording; stealing focus would break the paste target). Fixed position avoids per-app AX caret lookup — the lowest-complexity, lowest-risk option. Detail: [0002_recording-indicator-hud.md](0002_recording-indicator-hud.md).
+
+Exit criteria: a non-activating indicator shows recording/processing state across spaces and full-screen apps without moving focus off the target field (verified on-device); the `FreeFlowState → variant` mapping is unit-tested. Sequenced after the Menu-bar visual-state milestone (shares its state seam); orderable independently of the paste guard.
+
 ## M10: Local-install distribution
 
 Makefile target that does `swift build -c release`, assembles the bundle (`Info.plist` + entitlements), installs to `/Applications`, and signs with the local "Free Flow Dev" identity. README documents the one-time keychain certificate setup. Bundle assembly is verified with `codesign -dv` before install completes.
