@@ -27,54 +27,40 @@ Pick the category that matches where the code lives. Adding new categories is fi
 - `.debug` — verbose internal detail; off by default in user-visible filtering.
 - `.fault` — programmer error / invariant violation.
 
-## Privacy redaction — the explicit opt-in
+## Privacy: omission for content, redaction for paths
 
-By default, **all interpolated values are redacted as `<private>` in `os_log` output unless explicitly marked `public`.** This is correct for production: it protects user content (transcribed text, dictionary terms, etc.) from leaking into logs that the user might share for debugging.
+`os.Logger` redacts dynamic **string** interpolations as `<private>` by default and shows scalars (counts, lengths, state names) in the clear. Two rules build on that, and the privacy boundary is held *without* a verbose/debug build mode (see [ADR 0002](../decisions/0002-log-redaction-over-debug-flag.md) for why the old `DICTATION_VERBOSE_LOGS` flag was dropped).
 
-But during development, redaction makes log-based diagnosis painful. **A core failure mode of debugging this app is "I can't see the error message because it's redacted."**
+### 1. User content is never logged — at any privacy level
 
-### The pattern
-
-Two rules:
-
-1. **User content stays private.** Transcribed text, custom dictionary terms, clipboard contents — these never go to logs as `privacy: .public`. Period.
-2. **Diagnostic context (error messages, counts, lengths, state names) is selectively public, gated on a build flag.**
-
-The build flag is `--debug true` passed to the build script. When set, the build does two things:
-
-- Sets a compile-time flag `DICTATION_VERBOSE_LOGS` that the source code can `#if`-guard around `privacy: .public` annotations on selected logging calls (errors, sizes, state transitions).
-- **Prints a warning before the build runs:**
-
-  ```
-  ⚠️  --debug true: building with verbose logs.
-      Error messages and diagnostic counts will be visible in os_log output
-      (not redacted as <private>). User content like transcribed text remains private.
-      Do NOT use this build for distribution.
-  ```
-
-The user must read this warning before the build proceeds. **Why:** an explicit, one-line opt-in stops anyone from accidentally shipping a binary with verbose logging enabled. The warning is a confirmation that the developer knows what mode they're building in.
-
-### Examples
+Transcribed text, custom dictionary terms, and clipboard contents are kept *out of the format string entirely*. Log a `.count` or length, never the value. This is structural: there is no `privacy:` annotation to get wrong because the content is never interpolated.
 
 ```swift
-// Always-public: state machinery, non-sensitive counts.
-logger.info("State -> processing")
-logger.info("Audio captured: \(sampleCount) samples")
+logger.info("Transcribed \(text.count, privacy: .public) chars")   // length OK
+// logger.info("Transcription: '\(text)'")                          // NEVER
+```
 
-// Conditionally public: error strings (we want these visible for debugging
-// but they could occasionally include paths or other contextual info).
-#if DICTATION_VERBOSE_LOGS
-logger.error("Transcription failed: \(error.localizedDescription, privacy: .public)")
-#else
-logger.error("Transcription failed: \(error.localizedDescription)")
-#endif
+### 2. Error strings are public, but path-redacted
 
-// Never public: actual user content.
-logger.info("Transcription succeeded, length=\(text.count)")  // length OK
-// logger.info("Transcription: '\(text)'")                    // text NOT OK
+The failure *reason* is the most valuable line in a bug report, so error strings are logged `privacy: .public` to stay visible in the field. But an opaque third-party/OS `error.localizedDescription` can embed a filesystem path like `/Users/<name>/...` that carries the macOS account name. Pass every logged error string through `LogRedaction.redactUserPaths(_:)`, which strips it deterministically:
+
+```swift
+logger.error("WhisperKit load failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
+```
+
+`redactUserPaths` is idempotent and a no-op on app-authored error strings, so it's applied uniformly at *every* error-string log site — no per-site judgment about whether a value is "opaque enough." App-authored error descriptions (e.g. `AudioCaptureError`) carry no PII, but they pass through the same call so the rule stays mechanical.
+
+### Non-sensitive scalars are public directly
+
+Sample counts, character counts, state names, keycodes — logged `privacy: .public` with no wrapper. They're the bread-and-butter diagnostic signal and contain no PII.
+
+```swift
+logger.info("State -> processing")                                 // state name, public
+logger.info("Captured \(samples.count, privacy: .public) samples") // count, public
 ```
 
 ## Related
 
 - [../architecture/permissions.md](../architecture/permissions.md) — diagnosing permission failures depends on seeing real error messages
-- [anti-patterns.md](anti-patterns.md) — the "always-public logging" anti-pattern
+- [anti-patterns.md](anti-patterns.md) — item #4: logging user content / trusting an opaque error string
+- [../decisions/0002-log-redaction-over-debug-flag.md](../decisions/0002-log-redaction-over-debug-flag.md) — why path-redaction at the source replaced the verbose-build flag

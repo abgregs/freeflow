@@ -33,13 +33,13 @@ Some entries below are marked **structurally impossible** — the architecture m
 
 **Why:** a bundle without a valid `CFBundleIdentifier` is unidentifiable to TCC. macOS may accept it for *reading* events (Input Monitoring) but silently refuse to let it *post* events (Accessibility). The failure mode used to be invisible — no error, no log, no user feedback. In the current design, [`AccessibilityCapability`](../architecture/capabilities.md) includes a silent-no-op detector that catches this and reports `.denied`, opening onboarding. Even so, do not rely on the detector — produce a valid bundle in the first place. See [../architecture/distribution.md](../architecture/distribution.md).
 
-## 4. Always-public logging
+## 4. Logging user content, or trusting an opaque error string
 
-**Don't:** mark every interpolated value as `privacy: .public` because it makes debugging easier.
+**Don't:** interpolate user content (transcribed text, dictionary terms, clipboard contents) into a log line at *any* privacy level. And don't log a third-party/OS `error.localizedDescription` `privacy: .public` raw — you don't control what it contains across OS and library versions.
 
-**Do:** keep transcribed text and user content private always. Mark error strings and diagnostic counts as public only inside `#if DICTATION_VERBOSE_LOGS`, gated on the `--debug true` build flag which prints a confirmation warning. See [logging.md](logging.md).
+**Do:** keep user content out of the format string entirely — log a `.count` or length, never the value. Log error strings `privacy: .public` (so the failure *reason* survives in field bug reports) but pass them through `LogRedaction.redactUserPaths(_:)` first, which strips `/Users/<name>` paths that would otherwise leak the macOS account name. See [logging.md](logging.md).
 
-**Why:** logs get shared. Users send screenshots of Console. If transcribed text is in the log, it's now in a support thread. The opt-in `--debug` flag forces an explicit acknowledgment ("yes, I want verbose logs and I understand they should not ship") before any privacy boundary loosens.
+**Why:** logs get shared — users paste `log show` output into public issues. The protection for user content is *omission*: there's no `privacy:` flag to get wrong because the text is never in the line. The residual leak — a home path inside an opaque framework error — is closed deterministically at the source by `LogRedaction`, not by a build-mode flag that only one of six error logs ever adopted and that the non-developer users who actually file logs (running the signed release) could never toggle. See [../decisions/0002-log-redaction-over-debug-flag.md](../decisions/0002-log-redaction-over-debug-flag.md).
 
 ## 5. Dead manager classes
 

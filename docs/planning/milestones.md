@@ -40,7 +40,7 @@ Exit criteria: a 3+ second utterance returns a non-empty transcription that's a 
 
 ## M7: Text insertion
 
-`AccessibilityCapability.postKeyEvent(...)` is the only path that calls `CGEvent.post`. `TextInsertionManager` saves the pasteboard, writes the transcription, calls into the capability, restores after 250 ms. Capability includes the silent-no-op detector. Diagnostic logging available behind `--debug true`.
+`AccessibilityCapability.postKeyEvent(...)` is the only path that calls `CGEvent.post`. `TextInsertionManager` saves the pasteboard, writes the transcription, calls into the capability, restores after 250 ms. Capability includes the silent-no-op detector. Error strings log `privacy: .public` but path-redacted via `LogRedaction`; user content is protected by omission (see [ADR 0002](../decisions/0002-log-redaction-over-debug-flag.md)).
 
 Exit criteria: end-to-end test in Notes: hold key, speak, release, transcribed text appears at cursor. Clipboard restored afterward. Original clipboard contents preserved. If the capability is missing or misconfigured, the cycle aborts with a visible error and onboarding opens.
 
