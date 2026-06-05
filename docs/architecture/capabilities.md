@@ -101,13 +101,17 @@ Same pattern for `HotkeyManager` ↔ `InputMonitoringCapability` (the capability
 
 `OnboardingView` does not know about specific capabilities. It iterates `[any Capability]` and renders a row per capability with name, status (from the publisher), and a `Grant` button that calls `requestGrant()` — which triggers the auto-prompt (Microphone) or opens System Settings (Accessibility, Input Monitoring). The window opens whenever **any** capability's status is not `.granted`. The gate predicate is `OnboardingGate.shouldPresent(for:)` and the privacy-pane deep links live in one place as `SystemSettingsPane`.
 
+`OnboardingCoordinator` owns the launch-UI orchestration that this gating implies — the `NSWindow` lifetime, the activation policy, and the dismissal — so `AppDelegate` stays a thin lifecycle shell. Beyond the launch-time `presentIfNeeded()` check, the coordinator **subscribes to every capability's `status` publisher** and re-presents onboarding on a `.granted → !.granted` transition. This is the user-facing surface for **runtime capability degradation**: when the silent-no-op probe (below) flips `AccessibilityCapability.status` to `.denied` mid-session, or the user revokes a grant in System Settings while the app is running, the window re-opens on its own rather than waiting for the next launch. The reverse transition (`.denied → .granted`) is handled by the user re-clicking *Refresh* in the view, not by the coordinator.
+
 **Why:** any new permission added in the future just registers a new capability. Onboarding gets the new row for free. The "onboarding only fires on tap failure" failure mode is structurally impossible — the gating signal is "all capabilities granted," not "managers started successfully."
 
 ## Self-detection of TCC bundle misidentification
 
-`AccessibilityCapability.postKeyEvent` can detect the silent-no-op failure mode (where TCC accepts the call but doesn't deliver the event because the bundle ID isn't what TCC expected). It does this by attempting a small synthesized round-trip and checking for the expected side effect. If the action silently no-ops, the capability transitions `status` to `.denied` with a diagnostic logged at `.warning`, even if the OS reported `.granted`.
+`AccessibilityCapability.postKeyEvent` can detect the silent-no-op failure mode (where TCC accepts the call but doesn't deliver the event because the bundle ID isn't what TCC expected). The concrete probe (`probe()`) synthesizes a **Shift modifier-down via `.cghidEventTap`**, reads back `CGEventSource.flagsState(.combinedSessionState)`, and expects the shift bit to be set; it then synthesizes the release. Shift is chosen because it's invisible to any text field (no character, no LED), and `.cghidEventTap` matches the production paste tap so a probe failure mirrors a real post failure end-to-end. If the synthesized modifier is never reflected, the action silently no-ops: the capability transitions `status` to `.denied`, logs a diagnostic at `.warning`, and `postKeyEvent` throws `.silentNoOp` rather than posting — even if the OS reported `.granted`. If this technique ever proves unreliable in practice, the documented plan-B is a **CapsLock toggle pair** via `CGEventSource.keyState(.combinedSessionState, key: .capsLock)` (invasive but unambiguous — it toggles a visible LED).
 
-This is the third anti-pattern (bespoke bundle assembly) gaining a structural detector: a misconfigured bundle now manifests as `AccessibilityCapability.status == .denied`, which immediately opens onboarding, which tells the user something is wrong.
+The probe result is cached in `probeConfirmed` so the synthesized round-trip runs at most once per launch: it fires lazily at the **first `postKeyEvent` after the OS view is `.granted`**, then memoizes for subsequent posts. It is **reset whenever `recheck()` observes the OS view drop below `.granted`** (e.g., the user revokes the grant), so a later re-grant re-probes rather than trusting a stale confirmation. `recheck()` also runs the probe directly when it sees `.granted`, so a revoke-then-regrant settles `status` to the probed answer without waiting for the next post.
+
+This is the third anti-pattern (bespoke bundle assembly) gaining a structural detector: a misconfigured bundle now manifests as `AccessibilityCapability.status == .denied`, which `OnboardingCoordinator` observes and surfaces by re-opening onboarding (see *Onboarding consumes the capability set* above), telling the user something is wrong.
 
 ## Capabilities and the threading invariant
 
@@ -117,5 +121,6 @@ This is the third anti-pattern (bespoke bundle assembly) gaining a structural de
 
 - [permissions.md](permissions.md) — user-facing description of the three permissions
 - [river-session.md](river-session.md) — the session that consumes the capability-backed managers
+- [river-pipeline.md](river-pipeline.md) — traces the capability-failure surface end-to-end (typed `postKeyEvent` errors → `OnboardingCoordinator` re-present → the deferred session-level error publisher)
 - [threading-invariant.md](threading-invariant.md) — the rule that `InputMonitoringCapability` enforces
 - [../conventions/anti-patterns.md](../conventions/anti-patterns.md) — the lying-check and silent-paste anti-patterns that capabilities make structurally impossible
