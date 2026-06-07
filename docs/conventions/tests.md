@@ -12,6 +12,8 @@ Tests/
     ├── TapStateMachineTests.swift
     ├── SettingsStoreTests.swift
     ├── CapabilityTests.swift        # the capability layer, grouped (see below)
+    ├── AppStateTests.swift          # the Combine→Observable UI bridge
+    ├── MenuBarPresentationTests.swift  # the pure state→icon/label mapping
     └── ...
 ```
 
@@ -40,6 +42,8 @@ struct RiverSessionTests {
 | `HotkeyManager` event interpretation | Yes | Synthesize `CGEvent`s, feed directly into internal helpers; uses a fake `InputMonitoringCapability` so no real tap is created |
 | `SettingsStore` | Yes | Inject `UserDefaults(suiteName:)`; assert publisher emissions; assert dedupe behavior |
 | `Capability` consumers (managers) | Yes | Inject fake capabilities; assert capability methods are called; assert typed errors propagate |
+| `AppState` (Combine→`@Observable` bridge) | Yes | Drive `apply(_:)` directly; assert `state` propagation and that `errorMessage` is path-redacted at the boundary |
+| `MenuBarPresentation` mapping | Yes | Pure function; assert icon/label per state and the error-glyph override |
 | `Capability` implementations end-to-end | Partial | Inner logic is testable; the OS-call leaf cannot be exercised in CI (no TCC grant) |
 | `TranscriptionService` end-to-end | No | Requires WhisperKit model load, real audio, real Whisper run — not a unit test |
 | `TextInsertionManager` end-to-end | No | Requires a real Accessibility grant + a real target app for the paste to land |
@@ -67,6 +71,8 @@ Some methods are `internal` (not `private`) specifically so tests can exercise t
 - `AccessibilityCapability.probe()` — the pure Shift-modifier round-trip detector for the bundle-misidentification silent-no-op case, internal so the round-trip logic has a seam even though its OS-call leaf can't be exercised in CI
 - `*Capability.map(...)` — the pure status-mapping functions, internal so tests pin the granted/denied/unknown mapping without a real TCC grant
 - `RiverSession.configurationApplyCount` / `configurationDeferCount` — internal counters so tests can assert subscription wiring without reaching into the handler closures
+- `AppState.apply(_:)` — the two update entry points (`RiverState` and `RiverError`), internal so tests drive observation and the redaction-at-the-boundary choke point without standing up SwiftUI or a live session
+- `MenuBarPresentation.visual(state:hasError:)` — pure `state` + error → icon/label mapping, exercised directly so the [core-feature.md](../requirements/core-feature.md) item 5 icon/label contract has a regression guard without a real `MenuBarExtra`
 
 Mark them clearly:
 
