@@ -45,4 +45,5 @@ A `Skip (I've already granted permissions)` button exists for unsigned dev build
 
 - [activation-key-and-mode.md](activation-key-and-mode.md) — the activation gesture in detail
 - [../architecture/free-flow-pipeline.md](../architecture/free-flow-pipeline.md) — the implementation of the cycle
+- [../architecture/app-state-and-menu-bar.md](../architecture/app-state-and-menu-bar.md) — how the menu bar renders state and errors (item 5)
 - [../architecture/permissions.md](../architecture/permissions.md) — what each permission enables

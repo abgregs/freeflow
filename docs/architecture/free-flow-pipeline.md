@@ -38,13 +38,19 @@ The cost is that the user's clipboard is briefly replaced. We mitigate by saving
 
 ## Capability failures are typed errors
 
-If `AccessibilityCapability.postKeyEvent` throws (status not `.granted`, or the silent-no-op detector fires), `TextInsertionManager` restores the original pasteboard immediately, rethrows, and `FreeFlowSession.handleDeactivate` catches the error, logs at `.error`, and returns to `.idle`. The user-visible signal for the permission-misconfigured path is structural: the silent-no-op detector calls `update(.denied)` on the capability, which `OnboardingCoordinator` observes as a `.granted → !.granted` transition and re-presents the onboarding window with permission-specific copy. **Why this surface, not a session-level error publisher today:** the only renderer that could display a transient paste error (the menu-bar icon) does not yet render cycle state — that work is tracked in [../planning/_index.md](../planning/_index.md) ("Menu-bar visual state"). When it lands, it brings the renderer and the session-level error publisher in one move, rather than today's code carrying a publisher with no caller. Transient non-permission post failures (e.g., a momentary `cghidEventTap` refusal) are therefore log-only at this milestone — flagged as a known surface gap, not a silent failure.
+If `AccessibilityCapability.postKeyEvent` throws (status not `.granted`, or the silent-no-op detector fires), `TextInsertionManager` restores the original pasteboard immediately, rethrows, and `FreeFlowSession.handleDeactivate` catches the error, logs at `.error` (path-redacted per [ADR 0002](../decisions/0002-log-redaction-over-debug-flag.md)), and returns to `.idle`. There are now **two** user-visible surfaces:
+
+- **Permission-misconfigured path** — structural. The silent-no-op detector calls `update(.denied)` on the capability, which `OnboardingCoordinator` observes as a `.granted → !.granted` transition and re-presents onboarding with permission-specific copy.
+- **Transient cycle failures** (a momentary `cghidEventTap` refusal, a transcription or capture error) — the session emits a typed `FreeFlowError` on its `errors` publisher. [`AppState`](app-state-and-menu-bar.md) bridges that to the menu bar, which shows a warning glyph over the idle icon plus the (path-redacted) message. The emission never blocks the return to `.idle`.
+
+This is the surface the menu-bar visual-state milestone landed (it brought the renderer and the `errors` publisher together, as planned). It is **not** a substitute for the permission path above — a genuinely denied capability still routes through onboarding, not a transient toast.
 
 Audio capture follows the same pattern via `AudioCaptureError` (`.noAudioCaptured` when no buffer arrives in the 300 ms engine-warmup window; `.conversionFailed` when `AVAudioConverter` errors). `FreeFlowSession.handleDeactivate` catches both, logs at `.error`, and still returns to `.idle` — getting stuck in `.processing` would freeze the cycle. Note: `MicrophoneCapability.startEngine` itself does **not** throw (a failure to start logs a warning; the capability's `status` is the surface that signals "engine won't work" upstream to onboarding). The fail-loud surface is `stopRecording`, which is where "did we actually capture audio" becomes knowable.
 
 ## Related
 
 - [free-flow-session.md](free-flow-session.md) — the module that owns the orchestration and state machine
+- [app-state-and-menu-bar.md](app-state-and-menu-bar.md) — how `FreeFlowError` and `state` reach the menu bar via the `AppState` bridge
 - [capabilities.md](capabilities.md) — the per-permission modules each step depends on
 - [threading-invariant.md](threading-invariant.md) — why the event tap thread matters
 - [permissions.md](permissions.md) — user-facing description of what each capability enables

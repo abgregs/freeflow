@@ -4,14 +4,14 @@ Free Flow is a single-target macOS app that lives in the menu bar with no Dock p
 
 ## Process model
 
-One process. SwiftUI owns the `MenuBarExtra` and `Settings` scenes. `AppDelegate` is a thin lifecycle shell that constructs a [`FreeFlowSession`](free-flow-session.md) at launch and calls `start()`. After that, the delegate does not touch managers, does not own state, and does not handle settings notifications.
+One process. SwiftUI owns the `MenuBarExtra` and `Settings` scenes. `AppDelegate` is a thin lifecycle shell that constructs a [`FreeFlowSession`](free-flow-session.md) at launch and calls `start()`. After that, the delegate does not touch managers, does not own the cycle state, and does not handle settings notifications. (The cycle state is projected to the UI through the [`AppState`](app-state-and-menu-bar.md) bridge, which the delegate wires once at launch.)
 
 The composition stack:
 
 ```
 SwiftUI (MenuBarExtra, Settings)
     │
-    ├── observes FreeFlowSession.state for UI
+    ├── observes FreeFlowSession state + errors via AppState
     └── writes settings via @AppStorage  ─┐
                                           │ (also written by SettingsStore)
 AppDelegate (lifecycle only)              │
@@ -63,6 +63,7 @@ A single `FreeFlowState` enum (`.idle` / `.recording` / `.processing`) gates eve
 ## Cross-references
 
 - For the deep module that owns the cycle, see [free-flow-session.md](free-flow-session.md).
+- For how the UI observes the cycle without coupling to it, see [app-state-and-menu-bar.md](app-state-and-menu-bar.md).
 - For how permission checks are unified with the actions they gate, see [capabilities.md](capabilities.md).
 - For the typed settings layer, see [settings-store.md](settings-store.md).
 - For the threading constraint that makes the event tap reliable, see [threading-invariant.md](threading-invariant.md).

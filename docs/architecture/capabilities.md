@@ -121,6 +121,6 @@ This is the third anti-pattern (bespoke bundle assembly) gaining a structural de
 
 - [permissions.md](permissions.md) — user-facing description of the three permissions
 - [free-flow-session.md](free-flow-session.md) — the session that consumes the capability-backed managers
-- [free-flow-pipeline.md](free-flow-pipeline.md) — traces the capability-failure surface end-to-end (typed `postKeyEvent` errors → `OnboardingCoordinator` re-present → the deferred session-level error publisher)
+- [free-flow-pipeline.md](free-flow-pipeline.md) — traces the capability-failure surface end-to-end (typed `postKeyEvent` errors → `OnboardingCoordinator` re-present → the `FreeFlowSession.errors` publisher → menu bar)
 - [threading-invariant.md](threading-invariant.md) — the rule that `InputMonitoringCapability` enforces
 - [../conventions/anti-patterns.md](../conventions/anti-patterns.md) — the lying-check and silent-paste anti-patterns that capabilities make structurally impossible

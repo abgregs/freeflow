@@ -11,18 +11,19 @@
 final class FreeFlowSession {
     var state: AnyPublisher<FreeFlowState, Never> { get }   // observable for UI
     var currentState: FreeFlowState { get }                 // sync accessor for tests
+    var errors: AnyPublisher<FreeFlowError, Never> { get }  // per-stage cycle failures
 
     func start() async throws        // begin listening; idempotent
     func stop() async                // tear down cleanly; idempotent
 }
 ```
 
-That's it. There is no `reconfigure(...)` method. **Why:** configuration changes flow in via subscription to [SettingsStore](settings-store.md) publishers inside the session — pushing configuration into the session externally would re-create the leak we're trying to remove.
+That's it. There is no `reconfigure(...)` method. The `errors` publisher emits a `FreeFlowError` (one case per cycle stage) when capture, transcription, or paste fails — a side signal that never changes the cycle's return to `.idle`. The UI observes both publishers through [`AppState`](app-state-and-menu-bar.md), not directly. **Why:** configuration changes flow in via subscription to [SettingsStore](settings-store.md) publishers inside the session — pushing configuration into the session externally would re-create the leak we're trying to remove.
 
 ## What the session owns
 
 1. **The `FreeFlowState` machine** (`.idle` / `.recording` / `.processing`). The session is the only writer; the menu bar and content views observe via the `state` publisher.
-2. **The cycle orchestration.** When the hotkey fires `onActivate`, the session transitions to `.recording` and calls the capture module. When `onDeactivate` fires, it stops capture, transitions to `.processing`, runs transcription, posts the paste, and returns to `.idle`.
+2. **The cycle orchestration.** When the hotkey fires `onActivate`, the session transitions to `.recording` and calls the capture module. When `onDeactivate` fires, it stops capture, transitions to `.processing`, runs transcription, posts the paste, and returns to `.idle`. Each stage's failure is caught independently and emitted as a `FreeFlowError` on the `errors` publisher, without blocking the return to `.idle`.
 3. **Deferred reconfiguration.** When a settings change arrives via a SettingsStore publisher during a non-idle state, the session stores it and applies after the cycle completes. This is internal — callers never see it.
 4. **Re-entrancy guards.** Activations during `.recording` or `.processing` are no-ops with logging. Out-of-order events are no-ops with logging.
 
@@ -31,7 +32,7 @@ That's it. There is no `reconfigure(...)` method. **Why:** configuration changes
 - The CGEventTap thread. That's owned by [`InputMonitoringCapability`](capabilities.md), which `HotkeyManager` builds on.
 - Whisper model loading. That's owned by `TranscriptionService` and happens on its own schedule.
 - Settings storage. That's owned by [`SettingsStore`](settings-store.md). The session subscribes; it does not persist.
-- UI. The menu bar and Settings views observe `state`, but the session never reaches into them.
+- UI. The session imports no SwiftUI. The menu bar observes `state` and `errors` through the [`AppState`](app-state-and-menu-bar.md) bridge; the session never reaches into the UI.
 
 ## How it composes
 

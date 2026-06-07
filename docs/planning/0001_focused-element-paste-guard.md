@@ -30,7 +30,7 @@ AX role reporting in web and Electron content is unreliable — `contenteditable
 
 ## User-facing surface
 
-When the guard skips, it shows "No text field focused" via the menu-bar label / session-level error publisher rather than doing nothing visibly. That surface is built by the **Menu-bar visual-state** milestone (the renderer + session-level error publisher M7 deferred — see [current-focus.md](current-focus.md) "Next up"). Reusing it, instead of inventing a one-off signal here, is the reason this milestone is sequenced after it.
+When the guard skips, it shows "No text field focused" via the menu-bar label / session-level error publisher rather than doing nothing visibly. That surface was built by the **Menu-bar visual-state** milestone (the `FreeFlowSession.errors` publisher + the `AppState` bridge, now landed — see [../architecture/app-state-and-menu-bar.md](../architecture/app-state-and-menu-bar.md)). Reusing it, instead of inventing a one-off signal here, is the reason this milestone is sequenced after it.
 
 ## Acceptance criteria
 

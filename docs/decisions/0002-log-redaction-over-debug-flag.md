@@ -36,7 +36,7 @@ Drop the `DICTATION_VERBOSE_LOGS` build flag entirely. Log error strings `privac
 
 - **A genuinely sensitive value must be logged conditionally** (not just path-redacted) — e.g. a debugging need to dump buffer contents or a dictionary term. That's a real verbose-mode use case; prefer a **runtime** toggle (a setting the user can enable to reproduce, with a warning) over a compile-time flag, so field users can actually use it.
 - **A second PII vector enters error strings.** Extend `LogRedaction` with another rule and a test; keep redaction at the source.
-- **The menu-bar visual state milestone's session-level error publisher** starts surfacing error text in the UI — re-evaluate whether the same redaction belongs on that path before it reaches a screen.
+- **A UI path surfaces error text without going through `AppState`.** The menu-bar milestone landed this surface and applied redaction at the `AppState.apply(_:error:)` choke point (see [../architecture/app-state-and-menu-bar.md](../architecture/app-state-and-menu-bar.md)). If a future surface (e.g. the recording HUD) renders an error string by another route, re-apply redaction there — the boundary, not the publisher, is where it belongs.
 
 ## Related
 
