@@ -85,6 +85,8 @@ This works because `@AppStorage` reads and writes `UserDefaults.standard` direct
 
 This is the only acceptable form. Inline string literals for `UserDefaults` keys outside `Settings.*` declarations are an anti-pattern; see [../conventions/anti-patterns.md](../conventions/anti-patterns.md).
 
+**`@AppStorage` type limit.** `@AppStorage` only binds `Bool` / `Int` / `Double` / `String` / `URL` / `Data` / `RawRepresentable`. A setting whose type it can't represent — notably `[String]` (the custom dictionary) — binds through the typed `SettingsStore` from SwiftUI instead: the view reads `store.value(for:)` and writes `store.setValue(_:for:)`, usually via a small `@Observable` model (the way [`AppState`](app-state-and-menu-bar.md) bridges the session to the menu bar). The "key name in exactly two places" rule still holds for `@AppStorage`-bound keys; a typed-store-bound key simply has no `@AppStorage` annotation and its name lives only in the `SettingKey`.
+
 ## What does not belong in SettingsStore
 
 The exclusion list from [../conventions/persistence.md](../conventions/persistence.md) still applies — transcribed text, audio buffers, credentials. `SettingsStore` is for user-tunable settings, not for transient state or sensitive material.

@@ -52,6 +52,8 @@ The `store.value(for:)` call returns the typed value with the default applied if
 
 Note: `@AppStorage` does not support `CGKeyCode` (a `UInt32` typealias). Store as `Int` and cast at use sites — `Settings.activationKeyCode.defaultValue` is already an `Int`.
 
+Note: `@AppStorage` also can't bind collection types like `[String]` (the custom dictionary). Those bind through the typed store from SwiftUI — `store.value(for:)` / `store.setValue(_:for:)`, typically via a small `@Observable` model — not `@AppStorage`. See [../architecture/settings-store.md](../architecture/settings-store.md).
+
 ## Writing
 
 - SwiftUI writes via `@AppStorage` bindings — happens automatically when the user picks something in Settings.

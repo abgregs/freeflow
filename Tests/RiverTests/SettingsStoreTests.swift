@@ -30,8 +30,47 @@ struct SettingsStoreTests {
     }
 
     @MainActor
+    @Test("round-trips [String] and Bool settings")
+    func roundTripsCollectionAndBool() async throws {
+        let store = makeStore()
+        #expect(store.value(for: Settings.customDictionaryTerms) == [])
+        store.setValue(["Swift", "WhisperKit"], for: Settings.customDictionaryTerms)
+        #expect(store.value(for: Settings.customDictionaryTerms) == ["Swift", "WhisperKit"])
+
+        #expect(store.value(for: Settings.launchAtLogin) == false)
+        store.setValue(true, for: Settings.launchAtLogin)
+        #expect(store.value(for: Settings.launchAtLogin) == true)
+    }
+
+    @MainActor
+    @Test("an external UserDefaults write (like @AppStorage) reaches the publisher")
+    func externalWriteReachesPublisher() async throws {
+        // The load-bearing M8 path: SwiftUI `@AppStorage` writes straight to
+        // UserDefaults, bypassing `setValue`. If the store doesn't bridge that into
+        // its publisher, `RiverSession` never hears a settings change from the UI
+        // and live-apply silently breaks — the exact gap this regression guards.
+        let defaults = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+        let store = SettingsStore(defaults: defaults)
+        var received: [Int] = []
+        let token = store.publisher(for: Settings.activationKeyCode).sink { received.append($0) }
+        defer { token.cancel() }
+
+        defaults.set(99, forKey: Settings.activationKeyCode.name)   // bypasses setValue
+        await waitUntil { received.last == 99 }
+        #expect(received.last == 99)
+    }
+
+    @MainActor
     private func makeStore() -> SettingsStore {
         let suite = "test-\(UUID().uuidString)"
         return SettingsStore(defaults: UserDefaults(suiteName: suite)!)
+    }
+
+    @MainActor
+    private func waitUntil(_ condition: @MainActor () -> Bool) async {
+        for _ in 0..<200 {
+            if condition() { return }
+            try? await Task.sleep(nanoseconds: 5_000_000)   // up to ~1s total
+        }
     }
 }

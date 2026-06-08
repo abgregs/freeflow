@@ -11,16 +11,31 @@ enum Settings {
         name: "activationKeyCode",
         defaultValue: Constants.defaultActivationKeyCode
     )
+    static let customDictionaryTerms = SettingKey<[String]>(
+        name: "customDictionaryTerms",
+        defaultValue: Constants.defaultDictionaryTerms
+    )
+    static let launchAtLogin = SettingKey<Bool>(
+        name: "launchAtLogin",
+        defaultValue: false
+    )
 }
 
 @MainActor
 final class SettingsStore {
     private let defaults: UserDefaults
     private var subjects: [String: any SubjectErasing] = [:]
-    private var observation: NSKeyValueObservation?
+    private var reReaders: [String: () -> Void] = [:]
+    private var defaultsObserver: NSObjectProtocol?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+    }
+
+    deinit {
+        if let defaultsObserver {
+            NotificationCenter.default.removeObserver(defaultsObserver)
+        }
     }
 
     func value<V>(for key: SettingKey<V>) -> V {
@@ -41,7 +56,34 @@ final class SettingsStore {
         }
         let subject = CurrentValueSubject<V, Never>(readValue(for: key))
         subjects[key.name] = subject
+        // Re-read this key whenever UserDefaults changes out from under us — e.g.
+        // a SwiftUI `@AppStorage` write, which doesn't go through `setValue`.
+        reReaders[key.name] = { [weak self, weak subject] in
+            guard let self, let subject else { return }
+            subject.send(self.readValue(for: key))
+        }
+        startObservingIfNeeded()
         return subject.removeDuplicates().eraseToAnyPublisher()
+    }
+
+    // Bridges external `UserDefaults` writes (notably SwiftUI `@AppStorage`, which
+    // bypasses `setValue`) into the per-key subjects. The store is the single seam
+    // that filters: `removeDuplicates()` downstream means an unrelated key's write
+    // is a no-op for this publisher (settings-store.md). Without this, a settings
+    // change from the UI would never reach `RiverSession`.
+    private func startObservingIfNeeded() {
+        guard defaultsObserver == nil else { return }
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: defaults,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reReadAll() }
+        }
+    }
+
+    private func reReadAll() {
+        for reRead in reReaders.values { reRead() }
     }
 
     private func readValue<V>(for key: SettingKey<V>) -> V {

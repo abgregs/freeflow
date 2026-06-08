@@ -16,6 +16,11 @@ enum Constants {
     // on disk. The user-tunable picker lands in M8; see configuration.md.
     static let defaultModel: String = "openai_whisper-base.en"
 
+    // Seed for the user-editable custom dictionary. Empty by default; the user
+    // curates terms in Settings (M8). A curated starter list could be added here
+    // later. See requirements/custom-dictionary.md.
+    static let defaultDictionaryTerms: [String] = []
+
     // Gap between writing the transcription to the pasteboard + posting ⌘V and
     // restoring the user's original clipboard. 250 ms is the empirically smallest
     // delay that lets the target app's paste handler actually pull the new

@@ -46,15 +46,17 @@ Exit criteria: end-to-end test in Notes: hold key, speak, release, transcribed t
 
 ## M8: SettingsStore + Settings UI
 
-[`SettingsStore`](../architecture/settings-store.md) exists with typed per-key publishers. `Settings` namespace declares all keys with defaults. `SettingsView` with Activation section (key + mode pickers, warnings), Custom Dictionary section, model picker, launch-at-login, pause-media toggle. All SwiftUI bindings use `@AppStorage(Settings.x.name)`. `RiverSession` subscribes to the activation publishers and applies live (or defers during a cycle).
+[`SettingsStore`](../architecture/settings-store.md) gains typed per-key publishers for the settings whose consumers exist. `SettingsView` ships an Activation section (**key picker** + the Caps Lock/Hold warning), a Custom Dictionary section, and a launch-at-login toggle. SwiftUI binds `@AppStorage(Settings.x.name)` for the `Int`/`Bool` keys; the `[String]` dictionary binds through the typed `SettingsStore` (which `@AppStorage` can't represent). `RiverSession` already subscribes to the activation key publisher and applies-or-defers.
 
-Exit criteria: every documented setting changes the app's behavior without restart. Changing the activation key during an active recording does not drop the recording. The `pendingReconfiguration` deferral is verifiable via a unit test on `RiverSession`.
+The **mode picker** (+ `doubleTapWindowMs`) ships in M9 with the tap behavior; the **model picker** and **pause-media** are deferred (see [_index.md](_index.md) open items and [0003_pause-media-while-dictating.md](0003_pause-media-while-dictating.md)). Shipping those controls in M8 would mean a setting that changes nothing — barred by the no-silent-no-op rule.
+
+Exit criteria: every setting M8 ships changes behavior without restart. Changing the activation key during an active recording does not drop the recording. The `pendingReconfiguration` deferral is verifiable via a unit test on `RiverSession`.
 
 ## M9: Tap modes (Single Tap, Double Tap)
 
-`TapStateMachine` with explicit `State` enum. Wired into `HotkeyManager` so non-Hold modes route through it. Live-apply when mode changes via Settings flows through the same `RiverSession` subscription as M8.
+`TapStateMachine` with explicit `State` enum. Wired into `HotkeyManager` so non-Hold modes route through it. This milestone also brings the **mode picker + `doubleTapWindowMs`** to `SettingsView` (deferred out of M8): the `ActivationMode` enum, `SettingsStore` `RawRepresentable` encode/decode for it, and live-apply through the same `RiverSession` subscription as the activation key.
 
-Exit criteria: tests for state machine cover single-tap, double-tap within window, double-tap outside window, boundary, and stop-via-single-tap. End-to-end: all three modes work in Notes.
+Exit criteria: tests for state machine cover single-tap, double-tap within window, double-tap outside window, boundary, and stop-via-single-tap. Selecting a mode in Settings applies without restart. End-to-end: all three modes work in Notes.
 
 ## Focused-element paste guard
 
