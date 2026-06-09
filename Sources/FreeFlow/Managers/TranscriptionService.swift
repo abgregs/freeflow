@@ -55,7 +55,13 @@ final class TranscriptionService {
         logger.info("Loading WhisperKit model \(self.modelName, privacy: .public)")
         let modelName = self.modelName
         let task = Task<WhisperKit, Error> {
-            try await WhisperKit(model: modelName)
+            // `load: true` is required: without it (and without a `modelFolder`),
+            // WhisperKit's init downloads but does NOT call `loadModels()`, so the
+            // encoder/decoder/tokenizer stay nil until the first `transcribe`
+            // lazy-loads them. That broke two things: the "model loads at launch"
+            // guarantee, and the custom dictionary — `buildPromptTokens` read a nil
+            // `tokenizer` and silently produced an empty prompt.
+            try await WhisperKit(model: modelName, load: true)
         }
         loadTask = task
         do {
@@ -81,21 +87,49 @@ final class TranscriptionService {
         logger.info("Transcribing \(audioSamples.count, privacy: .public) samples")
 
         let promptTokens = buildPromptTokens(using: whisperKit)
-        let options = DecodingOptions(
-            promptTokens: promptTokens.isEmpty ? nil : promptTokens
-        )
+        var text = try await decode(audioSamples, promptTokens: promptTokens, using: whisperKit)
 
+        // A custom-dictionary prompt must only ever *help*. A small model like
+        // `base.en` can occasionally emit empty output when conditioned on a
+        // prompt; without this, adding a dictionary term could turn a working
+        // dictation into a hard `.emptyTranscription` error — strictly worse than
+        // no dictionary. Retry unprompted so the dictionary degrades to neutral.
+        // A genuinely silent recording still errors honestly (the retry is also
+        // empty). Logged so prompt-quality regressions stay observable.
+        if text.isEmpty, !promptTokens.isEmpty {
+            logger.warning("Prompted transcription was empty; retrying without the custom-dictionary prompt")
+            text = try await decode(audioSamples, promptTokens: [], using: whisperKit)
+        }
+
+        guard !text.isEmpty else { throw TranscriptionError.emptyTranscription }
+        logger.info("Transcribed \(text.count, privacy: .public) chars")
+        return text
+    }
+
+    private func decode(_ audioSamples: [Float], promptTokens: [Int], using whisperKit: WhisperKit) async throws -> String {
+        let options = DecodingOptions(promptTokens: promptTokens.isEmpty ? nil : promptTokens)
         let results: [TranscriptionResult]
         do {
             results = try await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options)
         } catch {
             throw TranscriptionError.transcriptionFailed(underlying: error)
         }
+        return results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
-        let text = results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { throw TranscriptionError.emptyTranscription }
-        logger.info("Transcribed \(text.count, privacy: .public) chars")
-        return text
+    // internal for the manual A/B eval harness (`DictionaryEvalTests`) — NOT used
+    // in production. Loads one fixed clip and decodes it twice: with the current
+    // custom-dictionary prompt and without, **bypassing** `transcribe`'s empty
+    // fallback, so the harness can see whether the prompt degenerates (empty) or
+    // actually biases the output. The clip is the only thing held constant; the
+    // prompt is the only variable.
+    func evaluateDictionaryPrompt(wavPath: String) async throws -> (promptTokenCount: Int, off: String, on: String) {
+        let samples = try AudioProcessor.loadAudioAsFloatArray(fromPath: wavPath)
+        guard let whisperKit else { throw TranscriptionError.modelNotLoaded }
+        let promptTokens = buildPromptTokens(using: whisperKit)
+        let off = try await decode(samples, promptTokens: [], using: whisperKit)
+        let on = try await decode(samples, promptTokens: promptTokens, using: whisperKit)
+        return (promptTokens.count, off, on)
     }
 
     private func buildPromptTokens(using whisperKit: WhisperKit) -> [Int] {
