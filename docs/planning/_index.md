@@ -8,6 +8,7 @@ Active and future work. Read this first when planning a new task; update it as w
 - [0001_focused-element-paste-guard.md](0001_focused-element-paste-guard.md) — detailed spec for a queued roadmap item: guard the paste against non-editable focus targets
 - [0002_recording-indicator-hud.md](0002_recording-indicator-hud.md) — detailed spec for a queued roadmap item: a floating, non-activating "recording…" status indicator (deferred)
 - [0003_pause-media-while-dictating.md](0003_pause-media-while-dictating.md) — detailed spec for a queued roadmap item: pause now-playing media during a recording, resume after (deferred out of M8)
+- [0004_model-loading-indicator.md](0004_model-loading-indicator.md) — detailed spec for a queued follow-up: surface model-loading ("warming up") state in the menu bar so early dictation isn't a silent fail (deferred from M8)
 
 Detailed specs for individual roadmap items live in their own files (like [walking-skeleton.md](walking-skeleton.md) for M1). New queued items use an ordered `NNNN_` filename prefix (`0001_`, `0002_`, …) so they sort in execution order.
 
