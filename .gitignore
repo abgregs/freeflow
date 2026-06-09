@@ -8,3 +8,7 @@ xcuserdata/
 Package.resolved
 .claude/worktrees/
 .claude/settings.local.json
+
+# Custom-dictionary A/B eval harness artifacts (local only — see DictionaryEvalTests)
+ab-result.txt
+*.m4a
