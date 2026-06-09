@@ -11,10 +11,13 @@ enum Constants {
     // `Int`; cast at use sites.
     static let defaultActivationKeyCode: Int = 61
 
-    // WhisperKit model identifier. `base.en` is the smallest English-only
-    // model that gives reasonable accuracy for dictation while staying ~140 MB
-    // on disk. The user-tunable picker lands in M8; see configuration.md.
-    static let defaultModel: String = "openai_whisper-base.en"
+    // WhisperKit model identifier. `small.en` is the default because the custom
+    // dictionary (prompt-token biasing) is unreliable on smaller models: `base.en`
+    // degenerates to empty output when given a prompt (verified via the A/B eval
+    // harness — see requirements/custom-dictionary.md). `small.en` (~240 MB) handles
+    // prompts robustly and is more accurate, at some cost in speed/memory. A model
+    // picker (deferred, M9+) can let speed-focused users drop back to `base.en`.
+    static let defaultModel: String = "openai_whisper-small.en"
 
     // Seed for the user-editable custom dictionary. Empty by default; the user
     // curates terms in Settings (M8). A curated starter list could be added here
