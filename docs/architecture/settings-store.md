@@ -18,7 +18,7 @@ final class SettingsStore {
     func value<V>(for key: SettingKey<V>) -> V
 
     // Write (also writes through to UserDefaults.standard so @AppStorage sees it)
-    func setValue<V>(_ value: V, for key: SettingKey<V>)
+    func setValue<V: Equatable>(_ value: V, for key: SettingKey<V>)   // Equatable: skips a no-op write/emit
 
     // Observe — fires only when the value for this key actually changes
     func publisher<V: Equatable>(for key: SettingKey<V>) -> AnyPublisher<V, Never>

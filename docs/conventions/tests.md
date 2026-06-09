@@ -73,6 +73,9 @@ Some methods are `internal` (not `private`) specifically so tests can exercise t
 - `FreeFlowSession.configurationApplyCount` / `configurationDeferCount` — internal counters so tests can assert subscription wiring without reaching into the handler closures
 - `AppState.apply(_:)` — the two update entry points (`FreeFlowState` and `FreeFlowError`), internal so tests drive observation and the redaction-at-the-boundary choke point without standing up SwiftUI or a live session
 - `MenuBarPresentation.visual(state:hasError:)` — pure `state` + error → icon/label mapping, exercised directly so the [core-feature.md](../requirements/core-feature.md) item 5 icon/label contract has a regression guard without a real `MenuBarExtra`
+- `ActivationKeyOption.all` / `capsLockHoldWarning(keyCode:)` — the pure activation-key table and the Caps Lock/Hold warning predicate, tested so a dropped key or changed warning copy is a failing test, not silent drift (mirrors `MenuBarPresentation`)
+- `DictionaryModel.add(_:)` / `remove(_:)` / `delete(at:)` — the `@Observable` custom-dictionary editor's mutation logic (trim, dedupe, persist), tested against an injected `UserDefaults` suite without SwiftUI
+- `TranscriptionService.evaluateDictionaryPrompt(wavPath:)` — internal seam for the **A/B eval harness** (`DictionaryEvalTests`): decodes one fixed clip with and without the dictionary prompt, bypassing the empty-fallback, so a recorded clip shows whether the prompt biases or degenerates. The harness is **env-gated** (`.enabled(if: FREEFLOW_AB_WAV)`) so the normal suite skips it; it loads the real model and writes its result to `ab-result.txt`. Used to confirm `small.en` biases where `base.en` empties (`requirements/custom-dictionary.md`)
 
 Mark them clearly:
 

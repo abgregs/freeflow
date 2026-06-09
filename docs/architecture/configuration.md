@@ -45,6 +45,10 @@ Live-apply is a structural property of [`FreeFlowSession`](free-flow-session.md)
 
 **Why this matters:** the previous-generation design exposed `UserDefaults.didChangeNotification` and required every observer to read keys, compare to last-applied values, and orchestrate deferral. All three steps are gone — typed publishers, structural deferral inside the session, no comparison required.
 
+## Not every setting flows through the session
+
+Only **cycle-timing-sensitive** settings (the activation key/mode → `HotkeyManager`) go through `FreeFlowSession`'s apply-or-defer path, because changing them mid-recording would tear down the event tap. Settings that aren't cycle-timed are wired at the app level instead: `AppDelegate` subscribes `Settings.customDictionaryTerms` and forwards it to `TranscriptionService.setCustomDictionaryTerms` (the dictionary is read at the *next* transcription, so it needs no deferral), and `launchAtLogin` is handled in the Settings view's `onChange` via `SMAppService`. The rule: route a setting through the session only if applying it mid-cycle would corrupt the cycle.
+
 ## Restart preserves the threading invariant
 
 When the session asks `HotkeyManager` to switch keys/modes, the manager calls into `InputMonitoringCapability` to stop the current tap (joining the event-tap thread cleanly) and create a new one. The capability always creates the new tap on a fresh `com.freeflow.eventtap` background thread with QoS `.userInteractive`. The threading rule lives in `InputMonitoringCapability` — there is no other path that creates a tap. See [threading-invariant.md](threading-invariant.md).
