@@ -44,7 +44,9 @@ struct FreeFlowSessionTests {
         let env = makeSession()
         #expect(env.session.configurationApplyCount == 0)
         try await env.session.start()
-        #expect(env.session.configurationApplyCount == 1)
+        // Two disruptive settings (key + mode) each emit their current value on
+        // subscribe and apply while idle.
+        #expect(env.session.configurationApplyCount == 2)
     }
 
     @MainActor
@@ -56,6 +58,43 @@ struct FreeFlowSessionTests {
         env.store.setValue(59, for: Settings.activationKeyCode)
         #expect(env.session.configurationApplyCount == baseline + 1)
         #expect(env.session.configurationDeferCount == 0)
+    }
+
+    @MainActor
+    @Test("activation mode change while idle applies immediately")
+    func modeChangeWhileIdleApplies() async throws {
+        let env = makeSession()
+        try await env.session.start()
+        let baseline = env.session.configurationApplyCount
+        env.store.setValue(ActivationMode.doubleTap, for: Settings.activationMode)
+        #expect(env.session.configurationApplyCount == baseline + 1)
+        #expect(env.session.configurationDeferCount == 0)
+    }
+
+    @MainActor
+    @Test("a tap-mode key change while recording applies live, keeps recording, and notifies")
+    func tapModeKeyChangeAppliesLive() async throws {
+        // The user changed the hotkey mid-recording in a tap mode. Unlike Hold
+        // (which defers), this applies immediately — the recording continues and a
+        // notice tells the user the new key now stops it. See free-flow-session.md.
+        let env = makeSession()
+        try await env.session.start()
+        env.store.setValue(ActivationMode.singleTap, for: Settings.activationMode)  // activeMode → singleTap
+
+        var notices: [String] = []
+        let token = env.session.notices.sink { notices.append($0) }
+        defer { token.cancel() }
+
+        env.session.handleActivate()  // → .recording
+        #expect(env.session.currentState == .recording)
+        let baseline = env.session.configurationApplyCount
+
+        env.store.setValue(59, for: Settings.activationKeyCode)  // change key mid-recording
+
+        #expect(env.session.currentState == .recording)              // not deferred, not stopped
+        #expect(env.session.configurationApplyCount == baseline + 1)  // applied live
+        #expect(env.session.configurationDeferCount == 0)
+        #expect(notices.count == 1)
     }
 
     @MainActor

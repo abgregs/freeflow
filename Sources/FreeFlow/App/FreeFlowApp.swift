@@ -40,6 +40,9 @@ private struct MenuBarContent: View {
         if let errorMessage = appState.errorMessage {
             Text(errorMessage)
         }
+        if let notice = appState.notice {
+            Text(notice)
+        }
         Divider()
         Button("Settings…") {
             NSApp.activate(ignoringOtherApps: true)

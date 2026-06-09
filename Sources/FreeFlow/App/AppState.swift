@@ -10,6 +10,7 @@ import Observation
 final class AppState {
     private(set) var state: FreeFlowState = .idle
     private(set) var errorMessage: String?
+    private(set) var notice: String?
 
     @ObservationIgnored private var cancellables = Set<AnyCancellable>()
 
@@ -20,14 +21,26 @@ final class AppState {
         session.errors
             .sink { [weak self] error in self?.apply(error) }
             .store(in: &cancellables)
+        session.notices
+            .sink { [weak self] notice in self?.apply(notice: notice) }
+            .store(in: &cancellables)
     }
 
     // internal for testability — the state-update entry point (also used by
     // `bind`). A fresh recording clears a stale error so the menu doesn't show
-    // last cycle's failure over a new one.
+    // last cycle's failure over a new one. A recording-context notice is tied to
+    // the live recording, so it clears the moment that recording ends.
     func apply(_ newState: FreeFlowState) {
         state = newState
         if newState == .recording { errorMessage = nil }
+        if newState != .recording { notice = nil }
+    }
+
+    // internal for testability — a recording-context notice (e.g. a live
+    // activation-settings change). Set during `.recording`; see `apply(_:)` for
+    // the clear-on-end lifecycle.
+    func apply(notice: String) {
+        self.notice = notice
     }
 
     // internal for testability — the error-update entry point (also used by

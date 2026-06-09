@@ -110,3 +110,111 @@ struct HotkeyManagerHoldTests {
         #expect(activates == 1)
     }
 }
+
+@Suite("HotkeyManager tap modes")
+struct HotkeyManagerTapTests {
+    // Tap modes act only on the completing (key-up) edge of a tap and route
+    // start/stop through the embedded TapStateMachine. Double-tap timing itself is
+    // covered in TapStateMachineTests; here two *immediate* taps are well within
+    // the 400 ms window, so they always pair under the real clock.
+
+    @MainActor
+    @Test("single tap: a completed tap starts, the next stops")
+    func singleTapToggles() {
+        let manager = makeManager(mode: .singleTap)
+        var activates = 0
+        var deactivates = 0
+        manager.onActivate = { activates += 1 }
+        manager.onDeactivate = { deactivates += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))  // key-down
+        #expect(activates == 0)  // a press alone does nothing in tap modes
+        manager.handle(.flagsChanged(keyCode: 62, flags: []))            // key-up → tap → start
+        #expect(activates == 1)
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))
+        manager.handle(.flagsChanged(keyCode: 62, flags: []))            // tap → stop
+        #expect(deactivates == 1)
+    }
+
+    @MainActor
+    @Test("holding the key in a tap mode is a single tap (fires on release only)")
+    func holdIsOneTap() {
+        let manager = makeManager(mode: .singleTap)
+        var activates = 0
+        manager.onActivate = { activates += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))  // press and "hold"
+        #expect(activates == 0)
+        manager.handle(.flagsChanged(keyCode: 62, flags: []))            // release completes the one tap
+        #expect(activates == 1)
+    }
+
+    @MainActor
+    @Test("double tap: two quick taps start, one tap stops")
+    func doubleTapStartsAndStops() {
+        let manager = makeManager(mode: .doubleTap)
+        var activates = 0
+        var deactivates = 0
+        manager.onActivate = { activates += 1 }
+        manager.onDeactivate = { deactivates += 1 }
+
+        tap(manager)
+        #expect(activates == 0)  // first tap: awaiting the second
+        tap(manager)
+        #expect(activates == 1)  // second tap within the window → start
+
+        tap(manager)
+        #expect(deactivates == 1)  // a single tap stops
+    }
+
+    @MainActor
+    @Test("a live key change preserves the recording: the new key stops it, the old key is ignored")
+    func liveKeyChangePreservesRecording() {
+        // This is the load-bearing behavior for live-apply (free-flow-session.md):
+        // switching the key mid-recording is a refilter, the tap machine keeps its
+        // .recording state, so the new key stops the in-flight recording while the
+        // old key falls silent.
+        let manager = makeManager(mode: .singleTap)
+        var deactivates = 0
+        manager.onActivate = {}
+        manager.onDeactivate = { deactivates += 1 }
+
+        tap(manager)                          // start recording on key 62
+        manager.setActivationKeyCode(59)      // live key change to Left Control
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))  // old key…
+        manager.handle(.flagsChanged(keyCode: 62, flags: []))            // …now ignored
+        #expect(deactivates == 0)
+
+        manager.handle(.flagsChanged(keyCode: 59, flags: .maskControl))  // new key…
+        manager.handle(.flagsChanged(keyCode: 59, flags: []))            // …stops the recording
+        #expect(deactivates == 1)
+    }
+
+    @MainActor
+    @Test("switching from Hold to a tap mode resets the press latch")
+    func modeSwitchResetsLatch() {
+        let manager = makeManager(mode: .hold)
+        var activates = 0
+        manager.onActivate = { activates += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))  // Hold: down → activate
+        #expect(activates == 1)
+        manager.setActivationMode(.singleTap)  // switch mid-press; latch must reset
+
+        tap(manager)  // a clean tap on the new mode starts a recording
+        #expect(activates == 2)
+    }
+
+    @MainActor
+    private func makeManager(mode: ActivationMode) -> HotkeyManager {
+        HotkeyManager(inputMonitoring: InputMonitoringCapability(), initialKeyCode: 62, initialMode: mode)
+    }
+
+    @MainActor
+    private func tap(_ manager: HotkeyManager, keyCode: Int64 = 62) {
+        manager.handle(.flagsChanged(keyCode: keyCode, flags: .maskControl))
+        manager.handle(.flagsChanged(keyCode: keyCode, flags: []))
+    }
+}

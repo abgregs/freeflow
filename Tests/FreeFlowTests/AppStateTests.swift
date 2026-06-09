@@ -39,4 +39,17 @@ struct AppStateTests {
         appState.apply(.recording)
         #expect(appState.errorMessage == nil)
     }
+
+    @MainActor
+    @Test("a recording-context notice shows during recording and clears when it ends")
+    func noticeShownThenClearedOnRecordingEnd() {
+        // The live-apply notice is tied to the current recording — it must vanish
+        // the moment that recording ends, not linger into the next cycle.
+        let appState = AppState()
+        appState.apply(.recording)
+        appState.apply(notice: "Activation key changed to Left Control. Press it to stop the current recording.")
+        #expect(appState.notice != nil)
+        appState.apply(.processing)
+        #expect(appState.notice == nil)
+    }
 }

@@ -22,6 +22,7 @@ final class FreeFlowSession {
     private let logger = Logger(subsystem: Constants.loggingSubsystem, category: "app")
     private let stateSubject = CurrentValueSubject<FreeFlowState, Never>(.idle)
     private let errorSubject = PassthroughSubject<FreeFlowError, Never>()
+    private let noticeSubject = PassthroughSubject<String, Never>()
 
     private let accessibility: AccessibilityCapability
     private let microphone: MicrophoneCapability
@@ -35,6 +36,9 @@ final class FreeFlowSession {
     private var isStarted = false
     private var cancellables = Set<AnyCancellable>()
     private var pendingReconfiguration: (() -> Void)?
+    // The mode driving the current recording — decides whether a mid-recording
+    // key/mode change applies live (tap modes) or is deferred (Hold).
+    private var activeMode: ActivationMode = Constants.defaultActivationMode
 
     // internal for testability — tests assert subscription wiring through the
     // counters rather than inspecting the handler closures.
@@ -46,6 +50,9 @@ final class FreeFlowSession {
     // The cycle-failure surface for the menu bar (and, later, the recording HUD
     // — planning 0002). Lands with a renderer per free-flow-pipeline.md.
     var errors: AnyPublisher<FreeFlowError, Never> { errorSubject.eraseToAnyPublisher() }
+    // Recording-context notices (e.g. "activation key changed — press it to stop").
+    // Same observers as `errors`; shown in the menu bar now, the HUD later.
+    var notices: AnyPublisher<String, Never> { noticeSubject.eraseToAnyPublisher() }
 
     init(
         accessibility: AccessibilityCapability,
@@ -154,26 +161,44 @@ final class FreeFlowSession {
         configurationApplyCount += 1
     }
 
-    // Subscribes to the activation publishers. Each subscription routes through
-    // `applyOrDeferReconfiguration` so a change during a non-idle cycle parks in
-    // `pendingReconfiguration` (anti-pattern #7). M8 adds the mode publisher.
+    // Subscribes to the activation publishers. Each change routes through
+    // `reconfigureHotkey`, which applies live, defers, or notifies depending on
+    // the cycle state and active mode.
     private func subscribeToConfiguration() {
         settings.publisher(for: Settings.activationKeyCode)
             .sink { [weak self] newCode in
-                self?.applyOrDeferReconfiguration { [weak self] in
+                self?.reconfigureHotkey(notice: ActivationNotice.keyChanged(toKeyCode: newCode)) { [weak self] in
                     self?.hotkey.setActivationKeyCode(newCode)
+                }
+            }
+            .store(in: &cancellables)
+        settings.publisher(for: Settings.activationMode)
+            .sink { [weak self] newMode in
+                self?.reconfigureHotkey(notice: ActivationNotice.modeChanged(to: newMode)) { [weak self] in
+                    self?.hotkey.setActivationMode(newMode)
+                    self?.activeMode = newMode
                 }
             }
             .store(in: &cancellables)
     }
 
-    // Structural deferral — anti-pattern #7. The pending closure runs on the
-    // next return to `.idle` (wired in M5 alongside the real cycle transitions).
-    private func applyOrDeferReconfiguration(_ apply: @escaping () -> Void) {
-        if currentState == .idle {
+    // Mode-dependent reconfiguration. Idle applies immediately. During a tap-mode
+    // recording the change applies LIVE and the user is notified — switching the
+    // key is a keycode refilter, not a tap teardown, so the running tap and the
+    // captured audio both survive, and the new key/mode is the stop gesture the
+    // user just chose. A Hold recording (the user is holding the old key, whose
+    // release must stay watched) and any `.processing` state defer to the next
+    // return to `.idle`. See architecture/free-flow-session.md.
+    private func reconfigureHotkey(notice: @autoclosure () -> String, _ apply: @escaping () -> Void) {
+        switch currentState {
+        case .idle:
             apply()
             configurationApplyCount += 1
-        } else {
+        case .recording where activeMode != .hold:
+            apply()
+            configurationApplyCount += 1
+            noticeSubject.send(notice())
+        case .recording, .processing:
             pendingReconfiguration = apply
             configurationDeferCount += 1
         }

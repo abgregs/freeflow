@@ -11,6 +11,10 @@ enum Settings {
         name: "activationKeyCode",
         defaultValue: Constants.defaultActivationKeyCode
     )
+    static let activationMode = SettingKey<ActivationMode>(
+        name: "activationMode",
+        defaultValue: Constants.defaultActivationMode
+    )
     static let customDictionaryTerms = SettingKey<[String]>(
         name: "customDictionaryTerms",
         defaultValue: Constants.defaultDictionaryTerms
@@ -87,15 +91,43 @@ final class SettingsStore {
     }
 
     private func readValue<V>(for key: SettingKey<V>) -> V {
-        guard defaults.object(forKey: key.name) != nil else { return key.defaultValue }
-        if let raw = defaults.object(forKey: key.name) as? V { return raw }
+        guard let stored = defaults.object(forKey: key.name) else { return key.defaultValue }
+        if let direct = stored as? V { return direct }
+        // Types that persist as something other than themselves (RawRepresentable
+        // enums store their raw value) decode here. Primitives and [String] take
+        // the direct path above. See settings-store.md.
+        if let convertible = V.self as? any DefaultsConvertible.Type,
+           let value = convertible.fromDefaults(stored) as? V {
+            return value
+        }
         return key.defaultValue
     }
 
     private func writeValue<V>(_ value: V, for key: SettingKey<V>) {
-        defaults.set(value, forKey: key.name)
+        if let convertible = value as? any DefaultsConvertible {
+            defaults.set(convertible.asDefaults, forKey: key.name)
+        } else {
+            defaults.set(value, forKey: key.name)
+        }
     }
 }
 
 protocol SubjectErasing: AnyObject {}
 extension CurrentValueSubject: SubjectErasing {}
+
+// How a non-primitive setting crosses the UserDefaults boundary. RawRepresentable
+// enums persist as their raw value; extend this here (not at the call site) for
+// any future type UserDefaults can't store directly. See settings-store.md.
+protocol DefaultsConvertible {
+    static func fromDefaults(_ stored: Any) -> Self?
+    var asDefaults: Any { get }
+}
+
+extension DefaultsConvertible where Self: RawRepresentable {
+    static func fromDefaults(_ stored: Any) -> Self? {
+        (stored as? RawValue).flatMap(Self.init(rawValue:))
+    }
+    var asDefaults: Any { rawValue }
+}
+
+extension ActivationMode: DefaultsConvertible {}

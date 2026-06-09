@@ -27,11 +27,12 @@ struct ActivationKeyOption: Identifiable, Equatable {
     /// Caps Lock keycode (`.maskAlphaShift`); Hold mode is unreliable on it.
     static let capsLockKeyCode = 57
 
-    /// Inline warning for the current selection in **Hold** mode, or `nil`.
-    /// M8 is Hold-only, so this fires only for Caps Lock; M9 will pass the mode.
-    /// Verbatim copy from requirements/activation-key-and-mode.md.
-    static func capsLockHoldWarning(keyCode: Int) -> String? {
-        keyCode == capsLockKeyCode
+    /// Inline warning for the current selection, or `nil`. Fires only for
+    /// Caps Lock paired with **Hold** mode — the tap modes work fine on Caps Lock
+    /// (they fire on key-up edges). Verbatim copy from
+    /// requirements/activation-key-and-mode.md.
+    static func capsLockHoldWarning(keyCode: Int, mode: ActivationMode) -> String? {
+        keyCode == capsLockKeyCode && mode == .hold
             ? "Caps Lock toggles on press and is unreliable in Hold mode. Switch to Single Tap or Double Tap."
             : nil
     }

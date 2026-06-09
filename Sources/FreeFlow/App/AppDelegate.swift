@@ -22,7 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             inputMonitoring: inputMonitoring,
             hotkey: HotkeyManager(
                 inputMonitoring: inputMonitoring,
-                initialKeyCode: settings.value(for: Settings.activationKeyCode)
+                initialKeyCode: settings.value(for: Settings.activationKeyCode),
+                initialMode: settings.value(for: Settings.activationMode)
             ),
             audio: AudioCaptureManager(microphone: microphone),
             textInsertion: TextInsertionManager(accessibility: accessibility),

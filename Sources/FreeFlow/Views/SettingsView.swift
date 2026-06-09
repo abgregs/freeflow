@@ -5,6 +5,8 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage(Settings.activationKeyCode.name)
     private var activationKeyCode: Int = Settings.activationKeyCode.defaultValue
+    @AppStorage(Settings.activationMode.name)
+    private var activationMode: ActivationMode = Settings.activationMode.defaultValue
     @AppStorage(Settings.launchAtLogin.name)
     private var launchAtLogin: Bool = Settings.launchAtLogin.defaultValue
 
@@ -35,7 +37,15 @@ struct SettingsView: View {
                     Text(option.label).tag(option.keyCode)
                 }
             }
-            if let warning = ActivationKeyOption.capsLockHoldWarning(keyCode: activationKeyCode) {
+            Picker("Activation Mode", selection: $activationMode) {
+                ForEach(ActivationMode.allCases) { mode in
+                    Text(mode.label).tag(mode)
+                }
+            }
+            Text(activationMode.description)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            if let warning = ActivationKeyOption.capsLockHoldWarning(keyCode: activationKeyCode, mode: activationMode) {
                 Label(warning, systemImage: "exclamationmark.triangle")
                     .font(.callout)
                     .foregroundStyle(.secondary)
