@@ -8,7 +8,7 @@ The user picks **one key** and **one mode** from Settings. Both are persisted to
 |---|---|
 | **Hold** (default) | Key-down → start recording. Key-up → stop and transcribe. |
 | **Single Tap** | First complete tap → start recording. Next complete tap → stop and transcribe. |
-| **Double Tap** | Two complete taps within `doubleTapWindowMs` (default 400 ms) → start. A single complete tap → stop. |
+| **Double Tap** | Two complete taps within a fixed ~400 ms window → start. A single complete tap → stop. |
 
 A "complete tap" means key-down followed by key-up. Holding the key in tap modes is treated as a single tap (no special behavior).
 
@@ -45,18 +45,20 @@ Declared as typed keys on the `Settings` namespace (backed by `UserDefaults.stan
 |---|---|---|
 | `Settings.activationKeyCode` | `Int` | `61` (Right Option) |
 | `Settings.activationMode` | `ActivationMode` | `.hold` |
-| `Settings.doubleTapWindowMs` | `Int` | `400` |
+
+The double-tap detection window is **not** a user setting — it's a fixed internal `Constants.doubleTapWindowMs` (400 ms). The user shouldn't have to tune it, so there is no control for it. See [../architecture/configuration.md](../architecture/configuration.md).
 
 See [../architecture/settings-store.md](../architecture/settings-store.md) for the typed read/write API and [../conventions/persistence.md](../conventions/persistence.md) for declaration conventions.
 
 ## Live apply
 
-[`RiverSession`](../architecture/river-session.md) subscribes to `store.publisher(for: Settings.activationKeyCode)` and `Settings.activationMode`. When either emits a new typed value:
+[`RiverSession`](../architecture/river-session.md) subscribes to `store.publisher(for: Settings.activationKeyCode)` and `Settings.activationMode`. When either emits a new typed value, the session applies it based on its state and the **active** mode:
 
-- If the session is `.idle`, it asks `HotkeyManager` to switch immediately. The manager rebuilds the event tap on a fresh `com.river.eventtap` thread (preserving the [threading invariant](../architecture/threading-invariant.md)).
-- If the session is `.recording` or `.processing`, the new value is stored as a pending reconfiguration and applied when the cycle returns to `.idle`. The Settings UI shows no special indicator — the change just applies a moment later. See [../architecture/river-session.md](../architecture/river-session.md).
+- **Idle** → `HotkeyManager` reconfigures the hotkey **in place** — it swaps the watched key/mode while the one event tap keeps running (no rebuild, preserving the [threading invariant](../architecture/threading-invariant.md)).
+- **Recording in a tap mode** → the change applies **live** and the recording continues. The newly-set key/mode immediately becomes the stop gesture, and the session posts a notice (in the menu bar now; the recording HUD later) confirming the user can use it to stop the current recording. No audio is lost, because nothing tears down the running tap.
+- **Recording in Hold mode, or processing** → the change is deferred and applied when the cycle returns to `.idle`. Hold defers because the user is physically holding the old key, whose release must still stop the recording.
 
-The deferral is structural; there is no path that lets a settings change tear down the event tap mid-cycle.
+There is no path that tears down the event tap mid-cycle; reconfiguration is always an in-place swap. See [../architecture/river-session.md](../architecture/river-session.md).
 
 ## Settings UI
 

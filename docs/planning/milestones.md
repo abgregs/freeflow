@@ -54,7 +54,7 @@ Exit criteria: every setting M8 ships changes behavior without restart. Changing
 
 ## M9: Tap modes (Single Tap, Double Tap)
 
-`TapStateMachine` with explicit `State` enum. Wired into `HotkeyManager` so non-Hold modes route through it. This milestone also brings the **mode picker + `doubleTapWindowMs`** to `SettingsView` (deferred out of M8): the `ActivationMode` enum, `SettingsStore` `RawRepresentable` encode/decode for it, and live-apply through the same `RiverSession` subscription as the activation key.
+`TapStateMachine` with explicit `State` enum. Wired into `HotkeyManager` so non-Hold modes route through it. This milestone also brings the **mode picker** to `SettingsView` (deferred out of M8): the `ActivationMode` enum, `SettingsStore` `RawRepresentable` support for it, and live-apply through the same `RiverSession` subscription as the activation key. `doubleTapWindowMs` stays an internal `Constants` tunable — not a setting, no slider. A mid-recording key/mode change applies **in place** during a tap-mode recording (with a user notice that the new key now stops it); Hold defers.
 
 Exit criteria: tests for state machine cover single-tap, double-tap within window, double-tap outside window, boundary, and stop-via-single-tap. Selecting a mode in Settings applies without restart. End-to-end: all three modes work in Notes.
 
@@ -84,4 +84,4 @@ Exit criteria: `git tag v0.1.0 && git push origin v0.1.0` results in a downloada
 
 ## Beyond
 
-Tracked as open items in [_index.md](_index.md). Examples: slider for `doubleTapWindowMs`, Fn-key warning, mid-cycle settings change visual feedback.
+Tracked as open items in [_index.md](_index.md). Examples: Fn-key warning, the recording HUD as the prominent home for the live-reconfiguration notice (the menu only shows it in the dropdown today).

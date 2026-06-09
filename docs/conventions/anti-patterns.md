@@ -59,7 +59,7 @@ Some entries below are marked **structurally impossible** — the architecture m
 
 **The shape that was forbidden:** an external observer calls `HotkeyManager.restart()` while `RiverSession.currentState != .idle`, tearing down the event tap mid-recording and dropping the audio buffer.
 
-**Why this can't happen in the current design:** there is no public `restart` method exposed externally. [`RiverSession`](../architecture/river-session.md) is the only consumer of `SettingsStore` activation publishers; the session inspects its own state and either applies immediately (when idle) or defers (when not). Settings UI cannot reach past the session to trigger a restart. The deferral logic is internal to the session and cannot be skipped.
+**Why this can't happen in the current design:** there is no public `restart` method, and *nothing recreates the event tap to apply a settings change.* [`RiverSession`](../architecture/river-session.md) is the only consumer of `SettingsStore` activation publishers; it inspects its own state and either applies the change **in place** (when idle, or live during a tap-mode recording) or defers it (a Hold recording or `.processing`). Applying in place is a keycode/mode swap on the one always-running tap — no `tapCreate`, no teardown, no dropped buffer — so even the live mid-recording path cannot reproduce the forbidden shape. The Settings UI cannot reach past the session, and the only `CGEvent.tapCreate` call site is `InputMonitoringCapability` at startup. See [../architecture/configuration.md](../architecture/configuration.md) and [../architecture/threading-invariant.md](../architecture/threading-invariant.md).
 
 ## 8. Inline `UserDefaults` key string literals outside `Settings.*`
 

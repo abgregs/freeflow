@@ -35,15 +35,13 @@ enum Settings {
     )
     static let activationMode = SettingKey<ActivationMode>(
         name: "activationMode",
-        defaultValue: .hold
-    )
-    static let doubleTapWindowMs = SettingKey<Int>(
-        name: "doubleTapWindowMs",
-        defaultValue: 400
+        defaultValue: Constants.defaultActivationMode
     )
     // ...
 }
 ```
+
+(The double-tap detection window is **not** a setting — it's an internal `Constants.doubleTapWindowMs` tunable; see [configuration.md](configuration.md).)
 
 Adding a new setting means adding one static member. Default lives next to the name; no parallel `Constants.defaultX` to drift out of sync.
 

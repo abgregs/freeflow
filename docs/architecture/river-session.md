@@ -12,19 +12,20 @@ final class RiverSession {
     var state: AnyPublisher<RiverState, Never> { get }   // observable for UI
     var currentState: RiverState { get }                 // sync accessor for tests
     var errors: AnyPublisher<RiverError, Never> { get }  // per-stage cycle failures
+    var notices: AnyPublisher<String, Never> { get }        // recording-context notices
 
     func start() async throws        // begin listening; idempotent
     func stop() async                // tear down cleanly; idempotent
 }
 ```
 
-That's it. There is no `reconfigure(...)` method. The `errors` publisher emits a `RiverError` (one case per cycle stage) when capture, transcription, or paste fails — a side signal that never changes the cycle's return to `.idle`. The UI observes both publishers through [`AppState`](app-state-and-menu-bar.md), not directly. **Why:** configuration changes flow in via subscription to [SettingsStore](settings-store.md) publishers inside the session — pushing configuration into the session externally would re-create the leak we're trying to remove.
+That's it. There is no `reconfigure(...)` method. The `errors` publisher emits a `RiverError` (one case per cycle stage) when capture, transcription, or paste fails — a side signal that never changes the cycle's return to `.idle`. The `notices` publisher emits a short message when a settings change is applied **live** during a tap-mode recording (e.g. "the new key now stops the recording"). The UI observes all three publishers through [`AppState`](app-state-and-menu-bar.md), not directly. **Why:** configuration changes flow in via subscription to [SettingsStore](settings-store.md) publishers inside the session — pushing configuration into the session externally would re-create the leak we're trying to remove.
 
 ## What the session owns
 
 1. **The `RiverState` machine** (`.idle` / `.recording` / `.processing`). The session is the only writer; the menu bar and content views observe via the `state` publisher.
 2. **The cycle orchestration.** When the hotkey fires `onActivate`, the session transitions to `.recording` and calls the capture module. When `onDeactivate` fires, it stops capture, transitions to `.processing`, runs transcription, posts the paste, and returns to `.idle`. Each stage's failure is caught independently and emitted as a `RiverError` on the `errors` publisher, without blocking the return to `.idle`.
-3. **Deferred reconfiguration.** When a settings change arrives via a SettingsStore publisher during a non-idle state, the session stores it and applies after the cycle completes. This is internal — callers never see it.
+3. **Live-or-deferred reconfiguration.** When an activation key/mode change arrives via a SettingsStore publisher, the session applies it by state and active mode: immediately when idle; **live, in place** during a tap-mode recording (plus a `notices` emission); deferred to the next `.idle` during a Hold recording or `.processing`. The session tracks the `activeMode` driving the current recording to make that choice. This is internal — callers never see it.
 4. **Re-entrancy guards.** Activations during `.recording` or `.processing` are no-ops with logging. Out-of-order events are no-ops with logging.
 
 ## What the session does not own
@@ -62,12 +63,13 @@ That's it. There is no `reconfigure(...)` method. The `errors` publisher emits a
 When the user changes the activation key or mode in Settings:
 
 1. SwiftUI writes through to `UserDefaults` via `@AppStorage`.
-2. `SettingsStore.publisher(for: .activationKeyCode)` emits the new typed value.
-3. The session's subscription receives it.
-4. If `state == .idle`, the session asks `HotkeyManager` to switch to the new key/mode immediately (which internally rebuilds the event tap on a fresh `com.river.eventtap` thread — see [threading-invariant.md](threading-invariant.md)).
-5. If `state != .idle`, the session stores the new value as a pending reconfiguration. On the next return to `.idle` (end of the transcribe/insert task), it applies.
+2. `SettingsStore.publisher(for: .activationKeyCode)` (or `.activationMode`) emits the new typed value.
+3. The session's subscription receives it and branches on `currentState` + `activeMode`:
+   - **`.idle`** → `HotkeyManager` reconfigures the hotkey **in place** (swap the watched key/mode; the one event tap keeps running — no rebuild, see [threading-invariant.md](threading-invariant.md)).
+   - **`.recording` in a tap mode** → applied **live, in place**; the recording keeps running and the session emits a `notices` message so the user knows the new key/mode now stops it. The surviving tap is why no audio is dropped — this is *not* the mid-cycle teardown anti-pattern #7 forbids; the session owns the change and there is no `tapCreate`.
+   - **`.recording` in Hold mode, or `.processing`** → stored as a pending reconfiguration and applied on the next return to `.idle`. Hold defers because the held old key's release must still stop the recording.
 
-**Why this matters:** in the previous-generation design, `AppDelegate` had to filter `UserDefaults.didChangeNotification`, compare to last-applied values, and orchestrate the deferral. All three steps are gone — typed publishers, structural deferral, no comparison required.
+**Why this matters:** in the previous-generation design, `AppDelegate` had to filter `UserDefaults.didChangeNotification`, compare to last-applied values, and orchestrate the deferral. All of that is gone — typed publishers, an in-place swap with no tap teardown, and a structural live-or-defer choice inside the session.
 
 ## Testability
 

@@ -24,7 +24,7 @@ enum Settings {
 
 Rules:
 
-- **Name:** lowerCamelCase, matches the property name. Short but descriptive. `doubleTapWindowMs` is better than `dtw` and better than `doubleTapDetectionWindowInMilliseconds`.
+- **Name:** lowerCamelCase, matches the property name. Short but descriptive — e.g. `doubleTapWindowMs` beats `dtw` and `doubleTapDetectionWindowInMilliseconds` (the same naming bar applies to `Constants` tunables, where that particular value actually lives — it isn't a setting).
 - **No prefixes.** `UserDefaults.standard` is already namespaced to the bundle ID.
 - **Default:** sourced from `Constants` for defaults that have semantic meaning (e.g., `defaultActivationKeyCode`); inline for simple values.
 - **One declaration only.** The string `"activationKeyCode"` appears in exactly one place in the codebase: the `SettingKey` declaration. SwiftUI references it via `Settings.activationKeyCode.name`. See [anti-patterns.md](anti-patterns.md) item #8.
