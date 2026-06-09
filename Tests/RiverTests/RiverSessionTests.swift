@@ -209,6 +209,30 @@ struct RiverSessionTests {
     }
 
     @MainActor
+    @Test("two settings deferred during one Hold recording both apply on return to .idle")
+    func multipleDeferredReconfigurationsAllApply() async throws {
+        // A single pending slot would drop the earlier change. With activeMode ==
+        // .hold (the default), both a key and a mode change during the recording
+        // defer, and both must land when the cycle returns to .idle.
+        let env = makeSession()
+        try await env.session.start()
+        let baseline = env.session.configurationApplyCount
+
+        env.session.handleActivate()
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        env.store.setValue(59, for: Settings.activationKeyCode)                     // deferred
+        env.store.setValue(ActivationMode.singleTap, for: Settings.activationMode)  // deferred
+        #expect(env.session.configurationApplyCount == baseline)   // both parked, none lost
+        #expect(env.session.configurationDeferCount == 2)
+
+        env.microphone.publishForTest(makeBuffer())
+        await env.session.handleDeactivate()
+        #expect(env.session.currentState == .idle)
+        #expect(env.session.configurationApplyCount == baseline + 2)  // both applied
+    }
+
+    @MainActor
     @Test(.disabled("end-to-end paste verification requires a loaded WhisperKit model + Accessibility grant — manual on-device before release. The insertion-catch branch in handleDeactivate is structurally identical to the transcription-catch (which is already covered by handleDeactivateReturnsToIdleOnAudioError indirectly) — reaching it in a unit test would require injecting a success-path TranscriptionService fake, which ADR 0001 defers until a second adapter shows up."))
     func endToEndPasteCycle() async throws {
         // Placeholder lives here so the gap is locatable in the suite, not

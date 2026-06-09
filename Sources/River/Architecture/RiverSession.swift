@@ -35,7 +35,10 @@ final class RiverSession {
 
     private var isStarted = false
     private var cancellables = Set<AnyCancellable>()
-    private var pendingReconfiguration: (() -> Void)?
+    // A list, not a single slot: two settings (key + mode) can both be deferred
+    // during one Hold recording or `.processing` window, and both must apply on
+    // the return to `.idle` — a single slot would drop the earlier one.
+    private var pendingReconfigurations: [() -> Void] = []
     // The mode driving the current recording — decides whether a mid-recording
     // key/mode change applies live (tap modes) or is deferred (Hold).
     private var activeMode: ActivationMode = Constants.defaultActivationMode
@@ -148,17 +151,20 @@ final class RiverSession {
         }
         stateSubject.send(.idle)
         logger.info("State -> idle")
-        applyPendingReconfiguration()
+        applyPendingReconfigurations()
     }
 
     // Pending reconfigurations parked during a non-idle cycle fire on the
     // return to `.idle` — closes the deferral loop documented in
     // `architecture/river-session.md` "Reconfiguration without leaks".
-    private func applyPendingReconfiguration() {
-        guard let apply = pendingReconfiguration else { return }
-        pendingReconfiguration = nil
-        apply()
-        configurationApplyCount += 1
+    private func applyPendingReconfigurations() {
+        guard !pendingReconfigurations.isEmpty else { return }
+        let pending = pendingReconfigurations
+        pendingReconfigurations.removeAll()
+        for apply in pending {
+            apply()
+            configurationApplyCount += 1
+        }
     }
 
     // Subscribes to the activation publishers. Each change routes through
@@ -199,7 +205,7 @@ final class RiverSession {
             configurationApplyCount += 1
             noticeSubject.send(notice())
         case .recording, .processing:
-            pendingReconfiguration = apply
+            pendingReconfigurations.append(apply)
             configurationDeferCount += 1
         }
     }
