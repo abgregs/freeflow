@@ -36,6 +36,14 @@ final class DictionaryModel {
         persist()
     }
 
+    // internal for testability — remove a specific term (the per-row delete
+    // button). Unambiguous because `add` keeps the list duplicate-free.
+    func remove(_ term: String) {
+        guard let index = terms.firstIndex(of: term) else { return }
+        terms.remove(at: index)
+        persist()
+    }
+
     private func persist() {
         store.setValue(terms, for: Settings.customDictionaryTerms)
     }
