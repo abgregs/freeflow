@@ -11,6 +11,17 @@ enum Constants {
     // `Int`; cast at use sites.
     static let defaultActivationKeyCode: Int = 61
 
+    // Default activation mode. Hold is the safe default — it fires on a held key
+    // and works on every supported key (the tap modes add ~50–100 ms latency and
+    // are the only ones reliable on Caps Lock). See requirements/activation-key-and-mode.md.
+    static let defaultActivationMode: ActivationMode = .hold
+
+    // Double-tap detection window. Two complete taps within this many milliseconds
+    // start a recording. Deliberately an internal tunable, NOT a user setting:
+    // exposing a slider is friction for a value the user shouldn't have to reason
+    // about. 400 ms matches the platform's double-click feel.
+    static let doubleTapWindowMs: Int = 400
+
     // WhisperKit model identifier. `small.en` is the default because the custom
     // dictionary (prompt-token biasing) is unreliable on smaller models: `base.en`
     // degenerates to empty output when given a prompt (verified via the A/B eval

@@ -43,6 +43,35 @@ struct SettingsStoreTests {
     }
 
     @MainActor
+    @Test("round-trips a RawRepresentable enum (ActivationMode) as its raw value")
+    func roundTripsActivationMode() async throws {
+        let store = makeStore()
+        #expect(store.value(for: Settings.activationMode) == .hold)  // default
+        store.setValue(ActivationMode.doubleTap, for: Settings.activationMode)
+        #expect(store.value(for: Settings.activationMode) == .doubleTap)
+    }
+
+    @MainActor
+    @Test("activationMode publisher dedupes; an @AppStorage-style raw write reaches it as the enum")
+    func activationModePublisher() async throws {
+        // SwiftUI's @AppStorage writes the *raw string* straight to UserDefaults.
+        // The store must decode it back to ActivationMode and emit it, or the
+        // session never hears a mode change from the UI (the M8 bridge bug class).
+        let defaults = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+        let store = SettingsStore(defaults: defaults)
+        var received: [ActivationMode] = []
+        let token = store.publisher(for: Settings.activationMode).sink { received.append($0) }
+        defer { token.cancel() }
+
+        store.setValue(ActivationMode.singleTap, for: Settings.activationMode)
+        store.setValue(ActivationMode.singleTap, for: Settings.activationMode)  // no-op
+        defaults.set(ActivationMode.doubleTap.rawValue, forKey: Settings.activationMode.name)  // bypasses setValue
+        await waitUntil { received.last == .doubleTap }
+
+        #expect(received == [.hold, .singleTap, .doubleTap])
+    }
+
+    @MainActor
     @Test("an external UserDefaults write (like @AppStorage) reaches the publisher")
     func externalWriteReachesPublisher() async throws {
         // The load-bearing M8 path: SwiftUI `@AppStorage` writes straight to
