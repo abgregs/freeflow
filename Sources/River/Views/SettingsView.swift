@@ -51,7 +51,18 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(dictionary.terms, id: \.self) { term in
-                Text(term)
+                HStack {
+                    Text(term)
+                    Spacer()
+                    Button {
+                        dictionary.remove(term)
+                    } label: {
+                        Image(systemName: "minus.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Remove “\(term)”")
+                }
             }
             .onDelete { dictionary.delete(at: $0) }
             HStack {

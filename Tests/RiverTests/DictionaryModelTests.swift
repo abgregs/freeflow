@@ -24,6 +24,17 @@ struct DictionaryModelTests {
     }
 
     @MainActor
+    @Test("remove deletes a specific term by value and persists")
+    func removeByValue() {
+        let store = makeStore()
+        let model = DictionaryModel(store: store)
+        model.add("a"); model.add("b"); model.add("c")
+        model.remove("b")
+        #expect(model.terms == ["a", "c"])
+        #expect(DictionaryModel(store: store).terms == ["a", "c"])   // persisted
+    }
+
+    @MainActor
     @Test("edits persist through the store so a reload sees them")
     func editsPersist() {
         // The add must write through the store — that's what fires the publisher
