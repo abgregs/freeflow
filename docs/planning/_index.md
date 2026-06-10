@@ -11,7 +11,7 @@ Planning lives in three layers:
 - [milestones.md](milestones.md) — the M1–M11 V1 sprint, greenfield to public release
 - [walking-skeleton.md](walking-skeleton.md) — the first milestone in detail: a runnable menu bar app that does nothing useful
 - [current-focus.md](current-focus.md) — what's actively in flight right now; updated as work moves
-- [0001_focused-element-paste-guard.md](0001_focused-element-paste-guard.md) — detailed spec for a queued roadmap item: guard the paste against non-editable focus targets
+- [0001_focused-element-paste-guard.md](0001_focused-element-paste-guard.md) — **landed 2026-06-10**: guard the paste against non-editable focus targets via a read-only AX role check; spec retained as the record
 - [0002_recording-indicator-hud.md](0002_recording-indicator-hud.md) — detailed spec for a queued roadmap item: a floating, non-activating "recording…" status indicator (deferred)
 - [0003_pause-media-while-dictating.md](0003_pause-media-while-dictating.md) — detailed spec for a queued roadmap item: pause now-playing media during a recording, resume after (deferred out of M8)
 - [0004_model-loading-indicator.md](0004_model-loading-indicator.md) — detailed spec for a queued follow-up: surface model-loading ("warming up") state in the menu bar so early dictation isn't a silent fail (deferred from M8)

@@ -1,6 +1,6 @@
 # Planning: Focused-element Paste Guard (roadmap 0001)
 
-A queued roadmap item, sequenced **after** the Menu-bar visual-state milestone. Guards the synthesized paste against firing into a target that can't accept it. The `0001_` prefix orders it in the roadmap; see [_index.md](_index.md).
+**Landed 2026-06-10** — see [current-focus.md](current-focus.md) for the as-built summary; this spec is retained as the record. Guards the synthesized paste against firing into a target that can't accept it. The `0001_` prefix orders it in the roadmap; see [_index.md](_index.md).
 
 ## Problem
 
@@ -14,7 +14,7 @@ Secondary: the first `postKeyEvent` after `.granted` runs `probe()`, which injec
 
 Before posting ⌘V, read the system-wide focused UI element and its AX role; proceed only if it's a text-bearing role, otherwise skip the paste and surface a "no text field focused" signal. APIs: `AXUIElementCreateSystemWide()` → `kAXFocusedUIElementAttribute` → `kAXRoleAttribute` (and subrole).
 
-**This is read-only AX, not the AX write path that "No AX-API path" rejected.** That decision rejected AX *writes* (setting a field's value) as brittle across browsers, Electron, and terminals. A role *read* is cheap and only gates whether we attempt the existing clipboard + ⌘V paste — it never becomes the insertion mechanism. **Coordination note for whoever implements this:** when the milestone lands, update the "No AX-API path" section of `river-pipeline.md` to record this read-only exception, so the doc doesn't read as "zero AX calls" when there's now one.
+**This is read-only AX, not the AX write path that "No AX-API path" rejected.** That decision rejected AX *writes* (setting a field's value) as brittle across browsers, Electron, and terminals. A role *read* is cheap and only gates whether we attempt the existing clipboard + ⌘V paste — it never becomes the insertion mechanism. **Coordination note (executed at landing):** the "No AX-API path" section of [`river-pipeline.md`](../architecture/river-pipeline.md) now records this read-only exception, so the doc doesn't read as "zero AX calls" when there's now one.
 
 ## Editable-role taxonomy
 

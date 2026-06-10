@@ -15,7 +15,7 @@ This collapses three otherwise-separate concerns into one pattern: permission de
 |---|---|---|
 | `MicrophoneCapability` | Audio capture | `AVCaptureDevice.requestAccess(.audio)` + `AVAudioEngine.start()` |
 | `InputMonitoringCapability` | Global event taps | `CGEvent.tapCreate(...)` |
-| `AccessibilityCapability` | Posting synthetic events to other apps | `CGEvent.post(...)` (specifically the synthesized ⌘V) |
+| `AccessibilityCapability` | Posting synthetic events to other apps | `CGEvent.post(...)` (specifically the synthesized ⌘V), plus the read-only focused-element role read behind the paste guard (`AXUIElementCopyAttributeValue` — see [river-pipeline.md](river-pipeline.md)) |
 
 ## Common interface
 
