@@ -2,7 +2,9 @@
 
 Ordered. Each milestone is a state the project can pause at without being broken. Milestones are *outcomes*, not task lists — the agent decomposes each into tasks via `/brief`.
 
-The first three milestones (M1–M3) establish the architectural skeleton — bundle pipeline, capability layer, dictation session — before any feature code is written. M4–M9 fill the session interior. M10–M11 cover distribution.
+**These eleven milestones are the project's initial build-out — a one-time scaffolding sprint to a usable, shippable V1, not an open-ended backlog.** M1–M3 establish the architectural skeleton (bundle pipeline, capability layer, dictation session) before any feature code; M4–M9 fill the session interior (the full hold/tap → capture → transcribe → paste cycle plus settings); M10–M11 ship it (local install, then public release). **M11 is the finish line: once it lands the app is at V1, and everything after builds on this foundation** — tracked as the numbered backlog in [_index.md](_index.md) (`0001_`, `0002_`, …), not as new M-numbers.
+
+**Status (as of M9):** M1–M9 are complete; M10–M11 (distribution + release) remain. The app is already functionally usable — the rest is about shipping it to others.
 
 ## M1: Walking skeleton
 
