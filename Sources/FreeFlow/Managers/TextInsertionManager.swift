@@ -3,6 +3,17 @@ import CoreGraphics
 import Foundation
 import os
 
+enum TextInsertionError: Error, LocalizedError {
+    case noEditableTarget
+
+    var errorDescription: String? {
+        switch self {
+        case .noEditableTarget:
+            return "No text field focused — click into a text field and try again."
+        }
+    }
+}
+
 @MainActor
 final class TextInsertionManager {
     /// Captures the full pasteboard (all items, all types) as opaque `Data` so
@@ -24,7 +35,20 @@ final class TextInsertionManager {
     /// pasteboard. On any throw before the restore, the original pasteboard is
     /// still restored — leaving the transcription in the user's clipboard
     /// would be a worse failure than the original paste error.
+    ///
+    /// Skips entirely (throwing `TextInsertionError.noEditableTarget`) when
+    /// the focused element is clearly non-editable. The guard runs before the
+    /// pasteboard is touched, so a skipped paste leaves the clipboard intact
+    /// and never triggers the capability's first-use probe.
     func insertText(_ text: String) async throws {
+        // Paste guard (planning 0001): a ⌘V into a non-editable target is
+        // indistinguishable from success after the fact, so check the focused
+        // element's role first. `.unknown` fails open — only a clearly
+        // non-editable role skips.
+        if accessibility.classifyFocusedTarget() == .nonEditable {
+            logger.info("insertText: skipped — focused element is not editable")
+            throw TextInsertionError.noEditableTarget
+        }
         let snapshot = savePasteboard()
         logger.info("insertText: starting (length=\(text.count, privacy: .public), snapshotItems=\(snapshot.items.count, privacy: .public))")
         do {

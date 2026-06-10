@@ -214,6 +214,74 @@ struct RealCapabilityContractTests {
     }
 }
 
+@Suite("AccessibilityCapability focused-target classification")
+struct FocusedTargetClassificationTests {
+    // The pure editable-role table behind the paste guard (planning 0001).
+    // These tests are the regression guard for acceptance criterion 4: the
+    // classification is pinned with no AX grant, while the OS-call leaf
+    // (reading the real focused element) stays untestable in CI.
+
+    @MainActor
+    @Test("editable roles classify as .editable", arguments: [
+        "AXTextField", "AXTextArea", "AXComboBox", "AXSearchField", "AXWebArea"
+    ])
+    func editableRoles(role: String) {
+        #expect(AccessibilityCapability.classifyFocusedTarget(role: role, subrole: nil) == .editable)
+    }
+
+    @MainActor
+    @Test("clearly non-editable roles classify as .nonEditable", arguments: [
+        "AXButton", "AXCheckBox", "AXRadioButton", "AXPopUpButton",
+        "AXMenuButton", "AXMenuItem", "AXLink", "AXImage", "AXStaticText",
+        "AXRow", "AXCell", "AXTable", "AXOutline", "AXList", "AXSlider",
+        "AXDisclosureTriangle"
+    ])
+    func nonEditableRoles(role: String) {
+        #expect(AccessibilityCapability.classifyFocusedTarget(role: role, subrole: nil) == .nonEditable)
+    }
+
+    @MainActor
+    @Test("unrecognized or missing roles classify as .unknown (fail open)")
+    func unknownRoles() {
+        // AX role reporting is unreliable in web/Electron content. Anything we
+        // can't positively classify must be .unknown so the guard attempts the
+        // paste — failing closed would regress working dictation.
+        #expect(AccessibilityCapability.classifyFocusedTarget(role: nil, subrole: nil) == .unknown)
+        #expect(AccessibilityCapability.classifyFocusedTarget(role: "AXUnheardOfRole", subrole: nil) == .unknown)
+        #expect(AccessibilityCapability.classifyFocusedTarget(role: "AXGroup", subrole: nil) == .unknown)
+    }
+
+    @MainActor
+    @Test("subrole does not override the role-based decision today")
+    func subroleIsInertForV1() {
+        // Pins the v1 contract: search/secure fields are AXTextField subroles,
+        // already admitted by role, and no subrole demotes an editable role.
+        // If a subrole-based rule lands later, this test should change with it.
+        #expect(AccessibilityCapability.classifyFocusedTarget(role: "AXTextField", subrole: "AXSearchField") == .editable)
+        #expect(AccessibilityCapability.classifyFocusedTarget(role: "AXTextField", subrole: "AXSecureTextField") == .editable)
+        #expect(AccessibilityCapability.classifyFocusedTarget(role: nil, subrole: "AXSearchField") == .unknown)
+    }
+
+    @MainActor
+    @Test("classification falls open to .unknown when status is below .granted")
+    func failsOpenWithoutGrant() {
+        // Without trust the AX read can't work; the guard must not block the
+        // paste attempt — postKeyEvent surfaces .notGranted as today.
+        let capability = AccessibilityCapability()
+        capability.setStatusForTesting(.denied)
+        #expect(capability.classifyFocusedTarget() == .unknown)
+    }
+
+    @MainActor
+    @Test("focusedTargetForTesting pins the classification")
+    func testSeamPinsClassification() {
+        let capability = AccessibilityCapability()
+        capability.setStatusForTesting(.granted)
+        capability.focusedTargetForTesting = .nonEditable
+        #expect(capability.classifyFocusedTarget() == .nonEditable)
+    }
+}
+
 @Suite("InputMonitoringCapability event decoding")
 struct InputMonitoringDecodeTests {
     // The decode helper is the only CGEvent → TapEvent surface. Tests synthesize

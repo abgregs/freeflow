@@ -5,6 +5,17 @@ import CoreGraphics
 import Foundation
 import os
 
+/// Classification of the system-wide focused UI element, read before posting
+/// the synthesized ⌘V (the paste guard, planning 0001). `.unknown` must fail
+/// OPEN: AX role reporting is unreliable in web/Electron content, and blocking
+/// on ambiguity would regress working dictation. Only a clearly non-editable
+/// role skips the paste.
+enum FocusedTargetClassification: Equatable {
+    case editable
+    case nonEditable
+    case unknown
+}
+
 enum AccessibilityCapabilityError: Error, LocalizedError {
     case notGranted
     case silentNoOp
@@ -52,6 +63,12 @@ final class AccessibilityCapability: Capability {
         probeConfirmed = (status == .granted)
         subject.send(status)
     }
+
+    // internal for testability — pins the focused-target classification so
+    // manager tests never reach the real AX read (which would classify
+    // whatever the test runner's host happens to have focused at test time).
+    // Mirrors `skipPostForTesting`.
+    var focusedTargetForTesting: FocusedTargetClassification?
 
     // Whether the silent-no-op probe has confirmed the capability for this
     // process this launch. Reset whenever the OS view drops below `.granted`
@@ -146,6 +163,107 @@ final class AccessibilityCapability: Capability {
             up.post(tap: .cghidEventTap)
         }
         return observed
+    }
+
+    /// Read-only focused-element role check for the paste guard (planning
+    /// 0001). Reads the system-wide focused UI element's role/subrole and
+    /// classifies it against the editable-role tables. This is read-only AX —
+    /// it only gates whether the clipboard + ⌘V paste is attempted and never
+    /// becomes the insertion mechanism (the "No AX-API path" decision in
+    /// free-flow-pipeline.md rejected AX *writes*).
+    func classifyFocusedTarget() -> FocusedTargetClassification {
+        if let focusedTargetForTesting { return focusedTargetForTesting }
+        // Without trust the AX read fails anyway (kAXErrorAPIDisabled) — fail
+        // open and let `postKeyEvent` surface `.notGranted` as today.
+        guard currentStatus == .granted else { return .unknown }
+        // Under the test flag, never touch the real AX read — the host's
+        // live focus would leak into the classification.
+        if skipPostForTesting { return .unknown }
+        let (role, subrole) = readFocusedElementRole()
+        let classification = Self.classifyFocusedTarget(role: role, subrole: subrole)
+        switch classification {
+        case .unknown:
+            insertLogger.info("Paste guard: focused-element role unknown (role=\(role ?? "nil", privacy: .public), subrole=\(subrole ?? "nil", privacy: .public)) — failing open.")
+        case .nonEditable:
+            insertLogger.info("Paste guard: focused element is not editable (role=\(role ?? "nil", privacy: .public)) — skipping paste.")
+        case .editable:
+            break
+        }
+        return classification
+    }
+
+    /// Pure editable-role table for the paste guard. Allowlisted roles →
+    /// `.editable`; clearly-non-text roles → `.nonEditable`; anything else
+    /// (nil, app-custom, under-reported web content) → `.unknown`, which the
+    /// caller treats as fail-open. `subrole` is accepted for future tuning but
+    /// unused today: the search/secure-field subroles live under `AXTextField`,
+    /// which the role allowlist already admits.
+    /// internal for testability (the AX read leaf can't be exercised in CI).
+    static func classifyFocusedTarget(role: String?, subrole: String?) -> FocusedTargetClassification {
+        guard let role else { return .unknown }
+        if editableRoles.contains(role) { return .editable }
+        if nonEditableRoles.contains(role) { return .nonEditable }
+        return .unknown
+    }
+
+    // Role strings are the stable AX constants (kAXTextFieldRole etc.); plain
+    // literals keep the two tables uniform since several entries (AXWebArea,
+    // AXSearchField, AXLink) have no kAX* constant in the HIServices headers.
+    private static let editableRoles: Set<String> = [
+        "AXTextField",      // includes search/secure fields by subrole
+        "AXTextArea",
+        "AXComboBox",
+        "AXSearchField",    // normally a subrole; admitted as a role defensively
+        "AXWebArea"         // web/Electron contenteditable under-reports — treat as editable
+    ]
+
+    // Deliberately conservative: only roles that can never accept a paste.
+    // AXGroup and anything app-custom stay off this list (fail open instead).
+    private static let nonEditableRoles: Set<String> = [
+        "AXButton",
+        "AXCheckBox",
+        "AXRadioButton",
+        "AXPopUpButton",
+        "AXMenuButton",
+        "AXMenuItem",
+        "AXLink",
+        "AXImage",
+        "AXStaticText",
+        "AXRow",
+        "AXCell",
+        "AXTable",
+        "AXOutline",
+        "AXList",
+        "AXSlider",
+        "AXDisclosureTriangle"
+    ]
+
+    // The OS-call leaf of the paste guard (untestable in CI — reading another
+    // app's focused element requires a real Accessibility grant). Any AX error
+    // collapses to nil so classification falls through to `.unknown`.
+    private func readFocusedElementRole() -> (role: String?, subrole: String?) {
+        var focused: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(
+            AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute as CFString, &focused
+        )
+        guard result == .success, let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else {
+            return (nil, nil)
+        }
+        // Safe: the CFGetTypeID guard above proves the CF type; `as!` on a CF
+        // ref is a bitcast, so the type-id check is the real validation.
+        let element = focused as! AXUIElement
+        return (
+            copyStringAttribute(kAXRoleAttribute, of: element),
+            copyStringAttribute(kAXSubroleAttribute, of: element)
+        )
+    }
+
+    private func copyStringAttribute(_ attribute: String, of element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else {
+            return nil
+        }
+        return value as? String
     }
 
     private func update(_ next: CapabilityStatus) {

@@ -92,6 +92,62 @@ struct TextInsertionManagerTests {
     }
 
     @MainActor
+    @Test("insertText skips paste entirely when the focused target is non-editable")
+    func insertTextSkipsNonEditableTarget() async {
+        // The paste guard (planning 0001), acceptance criterion 1: a clearly
+        // non-editable target gets NO ⌘V and the clipboard is never touched —
+        // not even written-then-restored. The throw is what surfaces the
+        // "No text field focused" signal via FreeFlowSession.errors.
+        let accessibility = AccessibilityCapability()
+        accessibility.skipPostForTesting = true
+        accessibility.setStatusForTesting(.granted)
+        accessibility.focusedTargetForTesting = .nonEditable
+        let manager = TextInsertionManager(accessibility: accessibility)
+
+        let preTestSnapshot = manager.savePasteboard()
+        defer { manager.restorePasteboard(preTestSnapshot) }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString("original", forType: .string)
+        let changeCountBefore = pasteboard.changeCount
+
+        await #expect(throws: TextInsertionError.self) {
+            try await manager.insertText("transcribed")
+        }
+        #expect(pasteboard.string(forType: .string) == "original")
+        #expect(pasteboard.changeCount == changeCountBefore)  // untouched, not restored
+        #expect(accessibility.postedEventCountForTesting == 0)
+    }
+
+    @MainActor
+    @Test("insertText fails open and pastes when the focused target is unknown", arguments: [
+        FocusedTargetClassification.unknown, FocusedTargetClassification.editable
+    ])
+    func insertTextPastesForUnknownOrEditable(classification: FocusedTargetClassification) async throws {
+        // Acceptance criteria 2 + 3: an editable target pastes as before, and
+        // an undeterminable role must behave identically (fail OPEN) — failing
+        // closed would regress dictation in apps with poor AX exposure.
+        let accessibility = AccessibilityCapability()
+        accessibility.skipPostForTesting = true
+        accessibility.setStatusForTesting(.granted)
+        accessibility.focusedTargetForTesting = classification
+        let manager = TextInsertionManager(accessibility: accessibility)
+
+        let preTestSnapshot = manager.savePasteboard()
+        defer { manager.restorePasteboard(preTestSnapshot) }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString("original", forType: .string)
+
+        try await manager.insertText("transcribed")
+
+        #expect(pasteboard.string(forType: .string) == "original")
+        #expect(accessibility.postedEventCountForTesting == 2)
+    }
+
+    @MainActor
     @Test("insertText with empty pasteboard snapshot still clears + restores cleanly")
     func insertTextEmptyPasteboard() async throws {
         // Edge case: nothing in the user's clipboard to begin with. Snapshot
