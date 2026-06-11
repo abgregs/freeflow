@@ -15,6 +15,8 @@ Planning lives in three layers:
 - [0002_recording-indicator-hud.md](0002_recording-indicator-hud.md) — detailed spec for a queued roadmap item: a floating, non-activating "recording…" status indicator (deferred)
 - [0003_pause-media-while-dictating.md](0003_pause-media-while-dictating.md) — detailed spec for a queued roadmap item: pause now-playing media during a recording, resume after (deferred out of M8)
 - [0004_model-loading-indicator.md](0004_model-loading-indicator.md) — detailed spec for a queued follow-up: surface model-loading ("warming up") state in the menu bar so early dictation isn't a silent fail (deferred from M8)
+- [0005_release-pipeline-security.md](0005_release-pipeline-security.md) — security checklist the M11 release pipeline must incorporate (workflow hardening, secrets, artifact integrity); feeds M11, from the 2026-06 security review
+- [0006_runtime-security-hardening.md](0006_runtime-security-hardening.md) — runtime findings from the same review: switch the event tap to `.listenOnly` (least privilege), plus the accepted pasteboard / model-cache / no-sandbox trade-offs on record
 
 Detailed specs for individual items live in their own files — a milestone (like [walking-skeleton.md](walking-skeleton.md) for M1) or a backlog item (the `NNNN_` files). The `NNNN_` prefix sorts the backlog roughly by intended order, not a strict queue.
 
@@ -22,7 +24,7 @@ Detailed specs for individual items live in their own files — a milestone (lik
 
 These are tracked here until they're picked up into an active milestone or moved to `requirements/`:
 
-- **Release automation**: GitHub Action to build → sign with Developer ID → notarize → attach DMG to release. See [../architecture/distribution.md](../architecture/distribution.md).
+- **Release automation**: GitHub Action to build → sign with Developer ID → notarize → attach DMG to release. See [../architecture/distribution.md](../architecture/distribution.md). Must satisfy the security checklist in [0005_release-pipeline-security.md](0005_release-pipeline-security.md).
 - **Homebrew cask**: tap repo + cask formula pointing at GitHub Releases.
 - **Apple Developer Program enrollment**: required for Developer ID signing and notarization ($99/yr).
 - **Settings UI for Fn key warning**: parallel to the existing Caps Lock + Hold warning.
