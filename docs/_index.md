@@ -2,7 +2,7 @@
 
 A macOS menu bar dictation app. Hold (or tap) a configurable activation key → capture mic audio → transcribe locally with WhisperKit → paste at cursor. Apple Silicon, macOS 14+.
 
-These docs are the source of truth for how Free Flow is built and maintained. Agents working in this repo should run `/brief` before non-trivial code changes and `/debrief` after.
+These docs are the source of truth for how Free Flow is built and maintained. Before a non-trivial change, surface the applicable conventions from these docs; afterwards, check them for staleness. The repo's `brief` and `debrief` skills (`.claude/skills/`) automate both for Claude Code users.
 
 ## Map
 

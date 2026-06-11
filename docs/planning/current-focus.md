@@ -30,12 +30,12 @@ What's actively in flight. Update this when you start or finish a milestone.
 
 **M10 (local-install distribution) and M11 (public release pipeline)** are the remaining V1-sprint milestones — see [milestones.md](milestones.md). M10 is mostly formalizing the existing `make install` flow; M11 is gated on Apple Developer Program enrollment.
 
-**Also queued: Recording indicator HUD** ([0002_recording-indicator-hud.md](0002_recording-indicator-hud.md)). A floating, fixed-position, non-activating "recording…" toast that observes the same `FreeFlowState` seam — mode-agnostic (identical for Hold / tap modes), deferred but captured. Depends on the menu-bar milestone's state seam (landed). Run `/brief` before starting.
+**Also queued: Recording indicator HUD** ([0002_recording-indicator-hud.md](0002_recording-indicator-hud.md)). A floating, fixed-position, non-activating "recording…" toast that observes the same `FreeFlowState` seam — mode-agnostic (identical for Hold / tap modes), deferred but captured. Depends on the menu-bar milestone's state seam (landed). Surface the applicable conventions (`brief` skill) before starting.
 
 ## Working agreement
 
-- Before any non-trivial code change: run `/brief` to find applicable conventions.
-- After any non-trivial code change: run `/debrief` to keep docs aligned.
+- Before any non-trivial code change: surface applicable conventions from `docs/` — the repo's `brief` skill (`.claude/skills/brief`) automates this.
+- After any non-trivial code change: check the docs for staleness — the repo's `debrief` skill automates this.
 - Commit using conventional commits (see [../conventions/git.md](../conventions/git.md)).
 - Don't push to `main` directly. PRs only.
 
@@ -43,4 +43,4 @@ What's actively in flight. Update this when you start or finish a milestone.
 
 - The architecture docs encode hard-won lessons from a predecessor implementation. Treat the **Why:** annotations seriously — they exist because someone got bitten.
 - The most common failure mode in this app's lineage is infrastructure that *looks* like it works but silently doesn't (a tap that fires but a paste that's blocked; a bundle that signs but has no identifier). Verify with `codesign -dv`, log inspection, and end-to-end tests in a real text field — not just "swift build succeeded."
-- If you find a gap in the docs while working, flag it in `/debrief` rather than just plowing through. The docs are designed to evolve with the code.
+- If you find a gap in the docs while working, flag it in the post-task doc review (`debrief` skill) rather than just plowing through. The docs are designed to evolve with the code.
