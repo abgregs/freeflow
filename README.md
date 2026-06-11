@@ -1,36 +1,114 @@
 # Free Flow
 
-A macOS menu bar dictation app. Press (or tap) a configurable modifier key, speak, and your words appear as text at your cursor — all transcribed on-device with WhisperKit.
+Free Flow is a free, open-source macOS menu bar dictation app: hold (or tap) a key, speak, and your words appear at your cursor — transcribed entirely on-device with [WhisperKit](https://github.com/argmaxinc/WhisperKit).
 
-> **Status:** M1 (walking skeleton) complete — runnable menu bar app, no feature code yet. Active focus tracked in [`docs/planning/current-focus.md`](docs/planning/current-focus.md).
+![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue?style=for-the-badge)
+![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-lightgrey?style=for-the-badge)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-## For users
+- works in any app that accepts paste — Slack, browser, terminal, IDE
+- three activation modes (Hold, Single Tap, Double Tap) on your choice of ten keys
+- custom dictionary for names, jargon, and proper nouns
+- clipboard-safe: full snapshot and restore around every paste
+- 100% on-device — no account, no telemetry, no subscription
 
-Not ready for users. When it is, you'll be able to:
+<!-- TODO(screenshots): capture from the running app and drop into assets/
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="assets/menu-bar.png" alt="Free Flow in the menu bar" />
+      <br />
+      <sub>Menu bar: Ready → Recording → Processing</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="assets/settings.png" alt="Free Flow settings" />
+      <br />
+      <sub>Settings: activation key, mode, custom dictionary</sub>
+    </td>
+  </tr>
+</table>
+-->
+
+> [!IMPORTANT]
+> Free Flow is V1 feature-complete but not yet packaged for release. Until the signed `.dmg` and Homebrew cask land ([current focus](docs/planning/current-focus.md)), install by [building from source](#build-from-source).
+
+## Why Free Flow?
+
+The name is the pitch. **Free**, as in anywhere: one hotkey in every app you can paste into, not a voice mode locked to one tool. **Free**, as in open source: no account, no subscription, nothing leaving your Mac. **Flow**, as in staying in a highly focused mental state: speak the thought and stay in the work.
+
+## How it works
+
+```mermaid
+%%{init: {"flowchart": {"curve": "basis"}}}%%
+flowchart LR
+    subgraph mac[" nothing leaves your Mac "]
+        direction LR
+        A("press or tap<br/>your activation key") -.-> B("record")
+        B -.-> C("release<br/>or tap again")
+        C -.-> D("transcribe on-device<br/>with WhisperKit")
+        D -.-> E("paste at cursor,<br/>clipboard restored")
+    end
+
+    classDef step fill:#4f8cc922,stroke:#5b8db8,stroke-width:1.5px
+    classDef boundary fill:transparent,stroke:#8a93a2,stroke-width:1.5px,stroke-dasharray:6 5
+    class A,B,C,D,E step
+    class mac boundary
+    linkStyle default stroke:#5b8db8,stroke-width:1.5px
+```
+
+The menu bar icon tracks each state of the cycle. Text lands via a synthesized ⌘V, and your previous clipboard — rich text and images included — is restored immediately after; clipboard-history managers will still record what you dictate.
+
+> [!NOTE]
+> First launch downloads the default model (~240 MB) from Hugging Face. Every launch and dictation after that is fully offline.
+
+## Features
+
+| Feature | Details |
+|---|---|
+| Activation modes | Hold (push-to-talk), Single Tap, or Double Tap |
+| Configurable key | Ten modifier-key options; default is Right Option |
+| Clipboard safety | Full pasteboard snapshot and restore; a paste guard skips non-editable targets |
+| Custom dictionary | Biases transcription toward your terms ("Vite", not "fight") |
+| Live settings | Key, mode, and dictionary changes apply instantly — no restart |
+| Guided onboarding | Step-by-step setup for Microphone, Input Monitoring, and Accessibility |
+| Languages | English only for now; multilingual may come later |
+
+## Install
+
+Coming with the release milestone:
 
 ```bash
 brew install --cask freeflow
 ```
 
-…or download a signed `.dmg` from the GitHub releases page.
+Requirements: macOS 14+ on Apple Silicon.
 
-## For contributors
+## Build from source
 
-1. **Read the docs.** Start at [`docs/_index.md`](docs/_index.md). Project context, conventions, architecture, and the roadmap all live there.
-2. **One-time setup** for local installs: create a self-signed code-signing certificate named "Free Flow Dev" in Keychain Access (Certificate Assistant → Create a Certificate → Self Signed Root → Code Signing). See [`docs/architecture/distribution.md`](docs/architecture/distribution.md).
-3. **Build the app:**
+Requires only the Xcode Command Line Tools (`xcode-select --install`) — no full Xcode needed.
+
+1. One-time: create a self-signed certificate named "Free Flow Dev" (Keychain Access → Certificate Assistant → Create a Certificate → Self Signed Root → Code Signing). Details in [docs/architecture/distribution.md](docs/architecture/distribution.md).
+2. Build and install:
    ```bash
-   git clone <repo>
+   git clone https://github.com/abgregs/free-flow.git
    cd free-flow
    swift build              # debug build
+   swift test               # test suite
    make install             # release + sign + install to /Applications
    ```
-4. **Grant permissions:** Microphone, Input Monitoring, and Accessibility (the last one must be added manually in System Settings → Privacy & Security → Accessibility). The onboarding window will walk you through this.
+3. Grant Microphone, Input Monitoring, and Accessibility when onboarding prompts you. Granting these to a self-built binary is a high-trust action — see [what you're trusting](docs/architecture/distribution.md).
 
-## For agents (Claude Code, etc.)
+Contributors: start at [docs/_index.md](docs/_index.md) — conventions, architecture, and the roadmap all live there.
 
-Read [`CLAUDE.md`](CLAUDE.md). Run `/brief` before non-trivial code changes and `/debrief` after.
+## Acknowledgments
+
+- [WhisperKit](https://github.com/argmaxinc/WhisperKit) (Argmax, MIT) — the on-device transcription engine
+- [Whisper](https://github.com/openai/whisper) (OpenAI, MIT) — the speech models; code and weights are both MIT
+- [swift-transformers](https://github.com/huggingface/swift-transformers) and [swift-jinja](https://github.com/huggingface/swift-jinja) (Hugging Face, Apache-2.0) — tokenizer and model-hub plumbing
+- Apple's [swift-argument-parser](https://github.com/apple/swift-argument-parser), [swift-collections](https://github.com/apple/swift-collections), [swift-crypto](https://github.com/apple/swift-crypto), and [swift-asn1](https://github.com/apple/swift-asn1) (Apache-2.0), plus [yyjson](https://github.com/ibireme/yyjson) (MIT) — transitive via WhisperKit
+
+Models are downloaded at runtime from [argmaxinc/whisperkit-coreml](https://huggingface.co/argmaxinc/whisperkit-coreml); this repository redistributes no model weights.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE) — every dependency is MIT or Apache-2.0.
