@@ -13,7 +13,7 @@ struct RiverApp: App {
         }
 
         SwiftUI.Settings {
-            SettingsView(settings: appDelegate.settings)
+            SettingsView()
         }
     }
 }
