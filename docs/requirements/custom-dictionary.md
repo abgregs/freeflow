@@ -1,11 +1,17 @@
 # Requirement: Custom Dictionary
 
-> **Status (2026-06-12): being cut from V1 and redesigned.** A field bug
+> **Status (2026-06-12): cut from V1 — removal landed.** A field bug
 > (prompt echo — dictionary terms hallucinated into the end of dictations)
 > plus the 224-token conditioning ceiling led to the decision in
 > [../planning/0008_custom-dictionary-redesign.md](../planning/0008_custom-dictionary-redesign.md).
-> This doc describes the implementation as it exists until the removal task
-> lands.
+> The Settings section, `DictionaryModel`, and the `AppDelegate` wiring are
+> gone — the service's term list is always empty, so the echo bug is
+> structurally impossible (previously persisted terms no longer bias
+> anything). Reserved for the redesign: the `customDictionaryTerms` key,
+> `TranscriptionService`'s prompt plumbing (`buildPromptTokens`, the
+> special-token filter, the empty-decode fallback, the A/B eval harness),
+> and the `small.en` default. The rest of this doc records the V1
+> implementation as it shipped, for the redesign to draw on.
 
 The user can add terms to a custom dictionary that biases WhisperKit toward recognizing those words. Useful for proper nouns, technical jargon, and personal names that Whisper's general model tends to mishear.
 

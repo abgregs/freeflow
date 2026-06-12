@@ -13,7 +13,7 @@ struct FreeFlowApp: App {
         }
 
         SwiftUI.Settings {
-            SettingsView(settings: appDelegate.settings)
+            SettingsView()
         }
     }
 }

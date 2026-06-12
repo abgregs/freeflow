@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import Foundation
 import SwiftUI
 import os
@@ -32,8 +31,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }()
 
-    private var cancellables = Set<AnyCancellable>()
-
     var capabilities: [any Capability] { [accessibility, microphone, inputMonitoring] }
 
     private(set) lazy var onboarding: OnboardingCoordinator = {
@@ -43,13 +40,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Application did finish launching")
         appState.bind(to: session)
-        // The custom dictionary isn't cycle-state-dependent (it's read at the next
-        // transcription), so it's wired here rather than through the session's
-        // apply-or-defer path. The publisher fires its current value on subscribe,
-        // seeding the service at launch.
-        settings.publisher(for: Settings.customDictionaryTerms)
-            .sink { [weak self] terms in self?.transcription.setCustomDictionaryTerms(terms) }
-            .store(in: &cancellables)
         onboarding.start()
         Task { @MainActor in
             do { try await session.start() }
