@@ -18,6 +18,7 @@ Planning lives in three layers:
 - [0005_release-pipeline-security.md](0005_release-pipeline-security.md) — security checklist the M11 release pipeline must incorporate (workflow hardening, secrets, artifact integrity); feeds M11, from the 2026-06 security review
 - [0006_runtime-security-hardening.md](0006_runtime-security-hardening.md) — runtime findings from the same review: switch the event tap to `.listenOnly` (least privilege), plus the accepted pasteboard / model-cache / no-sandbox trade-offs on record
 - [0007_transient-pasteboard-markers.md](0007_transient-pasteboard-markers.md) — mark both pasteboard writes with nspasteboard.org transient/concealed types so well-behaved clipboard managers stop recording dictations; upgrades 0006's pasteboard trade-off
+- [0008_custom-dictionary-redesign.md](0008_custom-dictionary-redesign.md) — cut the V1 dictionary UI (prompt-echo bug pastes unspoken terms; 224-token ceiling blocks role packs) and redesign as two tiers: budgeted prompt biasing + deterministic post-processing with role packs. **Includes a small pre-launch removal task.**
 
 Detailed specs for individual items live in their own files — a milestone (like [walking-skeleton.md](walking-skeleton.md) for M1) or a backlog item (the `NNNN_` files). The `NNNN_` prefix sorts the backlog roughly by intended order, not a strict queue.
 
