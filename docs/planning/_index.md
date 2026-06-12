@@ -17,6 +17,7 @@ Planning lives in three layers:
 - [0004_model-loading-indicator.md](0004_model-loading-indicator.md) — detailed spec for a queued follow-up: surface model-loading ("warming up") state in the menu bar so early dictation isn't a silent fail (deferred from M8)
 - [0005_release-pipeline-security.md](0005_release-pipeline-security.md) — security checklist the M11 release pipeline must incorporate (workflow hardening, secrets, artifact integrity); feeds M11, from the 2026-06 security review
 - [0006_runtime-security-hardening.md](0006_runtime-security-hardening.md) — runtime findings from the same review: switch the event tap to `.listenOnly` (least privilege), plus the accepted pasteboard / model-cache / no-sandbox trade-offs on record
+- [0007_transient-pasteboard-markers.md](0007_transient-pasteboard-markers.md) — mark both pasteboard writes with nspasteboard.org transient/concealed types so well-behaved clipboard managers stop recording dictations; upgrades 0006's pasteboard trade-off
 
 Detailed specs for individual items live in their own files — a milestone (like [walking-skeleton.md](walking-skeleton.md) for M1) or a backlog item (the `NNNN_` files). The `NNNN_` prefix sorts the backlog roughly by intended order, not a strict queue.
 
@@ -31,3 +32,4 @@ These are tracked here until they're picked up into an active milestone or moved
 - **Prominent live-reconfiguration notice**: M9 surfaces the "new key now stops the recording" message in the menu dropdown; an always-visible version rides the recording HUD ([0002_recording-indicator-hud.md](0002_recording-indicator-hud.md)).
 - **Model picker in Settings**: a `Constants` model list + off-cycle WhisperKit reload, letting speed-focused users drop back to `base.en`. Deferred through M9; future.
 - **Rename `TranscriptionService` → `TranscriptionManager`**: align with the `Manager` suffix convention chosen for cycle collaborators (see [../conventions/swift-style.md](../conventions/swift-style.md)). Standalone PR — touch the type name, file name, and the AppDelegate/session construction sites.
+- **macOS 16 pasteboard privacy**: Apple is rolling out prompts for programmatic pasteboard reads (preview shipped in macOS 15.4; enforcement expected in macOS 16). River's pre-paste snapshot is a programmatic read and may trigger the prompt — adopt the new `NSPasteboard.accessBehavior` / `detect` APIs and verify against the betas. Also raises the floor against pasteboard-polling snoopers, complementing [0007_transient-pasteboard-markers.md](0007_transient-pasteboard-markers.md).

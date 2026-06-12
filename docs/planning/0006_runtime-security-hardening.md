@@ -37,7 +37,10 @@ this) and verify on-device, not just in tests:
   paste-via-⌘V is the only universal insertion mechanism; AX writes were
   rejected (see "No AX-API path" in
   [../architecture/river-pipeline.md](../architecture/river-pipeline.md)).
-  The README carries the user-facing caveat.
+  The README carries the user-facing caveat. Planned upgrade:
+  [0007_transient-pasteboard-markers.md](0007_transient-pasteboard-markers.md)
+  marks both writes so well-behaved clipboard managers stop recording
+  dictations.
 - **The model cache is trusted without verification.** WhisperKit's cache under
   `~/Documents/huggingface/` is user-writable and the app loads whatever is
   there. **Why accepted:** a same-user attacker is outside the security
