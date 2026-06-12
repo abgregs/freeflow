@@ -5,7 +5,6 @@
 FreeFlow.app/
 build/
 xcuserdata/
-Package.resolved
 .claude/worktrees/
 .claude/settings.local.json
 

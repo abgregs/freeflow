@@ -1,5 +1,12 @@
 # Requirement: Custom Dictionary
 
+> **Status (2026-06-12): being cut from V1 and redesigned.** A field bug
+> (prompt echo — dictionary terms hallucinated into the end of dictations)
+> plus the 224-token conditioning ceiling led to the decision in
+> [../planning/0008_custom-dictionary-redesign.md](../planning/0008_custom-dictionary-redesign.md).
+> This doc describes the implementation as it exists until the removal task
+> lands.
+
 The user can add terms to a custom dictionary that biases WhisperKit toward recognizing those words. Useful for proper nouns, technical jargon, and personal names that Whisper's general model tends to mishear.
 
 ## User flow

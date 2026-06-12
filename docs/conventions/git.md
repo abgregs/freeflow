@@ -12,7 +12,7 @@ Conventional Commits. The first line is `type(scope): subject` under 72 characte
 
 Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, `ci`, `perf`, `style`.
 
-Scopes are loose but should reflect the area changed: `hotkey`, `audio`, `build`, `permissions`, `settings`, `claude` (for CLAUDE.md), etc.
+Scopes are loose but should reflect the area changed: `hotkey`, `audio`, `build`, `permissions`, `settings`, `agents` (for AGENTS.md and agent config), etc.
 
 Body uses dashes for bullets. Wrap at ~72 columns. Reference variables/functions/files in backticks. Include a `**Why:**` line in the body for any commit that introduces a non-obvious tradeoff or replaces a previous convention.
 

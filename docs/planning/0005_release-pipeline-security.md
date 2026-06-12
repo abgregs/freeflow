@@ -1,0 +1,67 @@
+# Planning: Release Pipeline Security Checklist (roadmap 0005)
+
+Hardening requirements for the M11 public release pipeline, captured during the
+2026-06 pre-publication security review. The M11 GitHub Action must incorporate
+this checklist — it gates M11's exit criteria, it is not a post-V1 enhancement.
+
+## Why this exists
+
+Free Flow runs with Microphone + Input Monitoring + Accessibility granted. A
+compromised release pipeline doesn't just ship a bad build — it ships a binary
+users will hand the most powerful permission set macOS offers. The pipeline is
+part of the attack surface; its integrity guarantees are a feature.
+
+## Checklist
+
+### Workflow hardening
+
+- Pin every GitHub Action to a full commit SHA, not a tag or branch.
+- Set explicit least-privilege `permissions:` on the workflow (`contents: write`
+  for the release upload; nothing else).
+- Trigger only on version tags, and enable tag protection (plus branch
+  protection on `main`) once the repo is public. **Why:** a tag push *is* a
+  release trigger — anyone who can push a tag can ship a release.
+
+### Secrets
+
+- The Developer ID certificate (`.p12`) and `notarytool` credentials live in
+  GitHub encrypted secrets, are imported into an ephemeral keychain on the
+  runner, and are removed in a cleanup step that runs even on failure.
+- No secret is ever echoed to logs; no `set -x` in release scripts.
+
+### Artifact integrity
+
+- Publish a SHA-256 checksum alongside the `.dmg` on the release page.
+- Release artifacts are immutable: never replace an asset under an existing
+  tag — fix forward with a new tag.
+- The Homebrew cask's mandatory `sha256` field must reference the published
+  checksum; it gives users install-time integrity for free.
+
+### Build provenance
+
+- CI builds from the committed `Package.resolved` (default `swift build`
+  behavior). Never run `swift package update` in CI.
+- Build from the tagged commit only — no workflow inputs that build arbitrary
+  refs.
+
+### Release-build behavior
+
+- Decide the fate of onboarding's "Skip (I've already granted permissions)"
+  button in notarized release builds: its unsigned-dev-build rationale (see
+  [../requirements/core-feature.md](../requirements/core-feature.md)) doesn't
+  apply to a notarized app.
+
+## Acceptance criteria
+
+1. The M11 workflow file passes review against every item above before the
+   first public tag is pushed.
+2. A released `.dmg`'s checksum matches both the published SHA-256 and the
+   cask's `sha256`.
+3. Tag and branch protection are verified in repository settings after the repo
+   goes public.
+
+## Related
+
+- [milestones.md](milestones.md) — M11, the pipeline this gates
+- [../architecture/distribution.md](../architecture/distribution.md) — channels and signing identities
+- [0006_runtime-security-hardening.md](0006_runtime-security-hardening.md) — the same review's runtime findings

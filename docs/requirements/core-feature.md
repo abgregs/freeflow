@@ -36,7 +36,8 @@ A `Skip (I've already granted permissions)` button exists for unsigned dev build
 ## Non-requirements (deliberately out of scope)
 
 - Cloud transcription fallback.
-- Multi-language UI (the dictation itself is multilingual via WhisperKit; the app UI is English-only).
+- Non-English dictation. The default model is Whisper's English-only `small.en` variant, so dictation only supports English for now; that may change later (the planned model picker is the natural seam for offering multilingual variants). **Why:** at the model sizes Free Flow targets, the `.en` variants transcribe English measurably better than the same-size multilingual model and can't misdetect the spoken language.
+- Multi-language UI (the app UI is English-only).
 - Mac App Store distribution.
 - iOS / iPadOS support.
 - Real-time streaming transcription (transcription happens after release, not during).

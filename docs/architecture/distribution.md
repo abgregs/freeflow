@@ -21,6 +21,13 @@ Local builds always use Free Flow Dev. **Why:** ad-hoc signing produces a new co
 
 Release builds use Developer ID. **Why:** macOS Gatekeeper warns sharply on Developer ID-unsigned downloads; for an app that asks for Accessibility this kills trust. Developer ID + notarization makes the app a first-class macOS citizen.
 
+## What a source-build contributor is trusting
+
+Two facts to understand before running `make install` and granting permissions:
+
+- **The self-signed certificate is not scoped to Free Flow.** Once "Free Flow Dev" exists in the login keychain, any process running as your user can sign with it. It confers no system trust — Gatekeeper still treats the result as unidentified. Its only job is keeping the code-directory hash (and therefore TCC grants) stable across rebuilds.
+- **Granting Microphone + Input Monitoring + Accessibility to a self-built, non-notarized binary is the highest-trust permission set macOS has.** Nothing vouches for the binary except the source you built it from. The architecture keeps that reading tractable: each gated OS call has exactly one call site, in the corresponding [capability](capabilities.md).
+
 ## Bundle ID is load-bearing
 
 The bundle ID is `com.freeflow.app`. It must:
