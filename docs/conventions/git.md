@@ -62,7 +62,7 @@ No emoji. No co-author trailers from tools. No `chore: misc updates` style commi
 
 ## What touches `main`
 
-- Only PR merges, via **rebase merge** — keeps `main`'s history linear with the branch's conventional commits preserved (the documented-in-`_index.md` decision was never written down; this records the convention the existing 46-commit linear history already follows).
+- Only PR merges, via **merge commit** — each PR lands as an explicit `Merge pull request #N` commit with the branch's conventional commits preserved beneath it. **Why:** replaces the rebase-merge convention previously recorded here — PRs #2 and #3 merged with merge commits, and the merge bubble keeps PR boundaries visible in history; the doc now matches actual practice.
 - Hotfixes follow the same PR flow, just on a `hotfix/` branch.
 - Direct push to `main` is permanently disabled in repo settings.
 
