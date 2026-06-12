@@ -10,19 +10,11 @@ struct SettingsView: View {
     @AppStorage(Settings.launchAtLogin.name)
     private var launchAtLogin: Bool = Settings.launchAtLogin.defaultValue
 
-    @State private var dictionary: DictionaryModel
-    @State private var newTerm: String = ""
-
     private let logger = Logger(subsystem: Constants.loggingSubsystem, category: "app")
-
-    init(settings: SettingsStore) {
-        _dictionary = State(initialValue: DictionaryModel(store: settings))
-    }
 
     var body: some View {
         Form {
             activationSection
-            dictionarySection
             generalSection
             aboutSection
         }
@@ -53,37 +45,6 @@ struct SettingsView: View {
         }
     }
 
-    private var dictionarySection: some View {
-        Section("Custom Dictionary") {
-            if dictionary.terms.isEmpty {
-                Text("No terms yet. Add proper nouns or jargon Whisper tends to mishear.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(dictionary.terms, id: \.self) { term in
-                HStack {
-                    Text(term)
-                    Spacer()
-                    Button {
-                        dictionary.remove(term)
-                    } label: {
-                        Image(systemName: "minus.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Remove “\(term)”")
-                }
-            }
-            .onDelete { dictionary.delete(at: $0) }
-            HStack {
-                TextField("Add a term", text: $newTerm)
-                    .onSubmit(addTerm)
-                Button("Add", action: addTerm)
-                    .disabled(newTerm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-    }
-
     private var generalSection: some View {
         Section("General") {
             Toggle("Launch at login", isOn: $launchAtLogin)
@@ -97,11 +58,6 @@ struct SettingsView: View {
         Section("About") {
             LabeledContent("Version", value: appVersion)
         }
-    }
-
-    private func addTerm() {
-        dictionary.add(newTerm)
-        newTerm = ""
     }
 
     private func updateLaunchAtLogin(_ enabled: Bool) {

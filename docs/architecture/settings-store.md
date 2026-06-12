@@ -51,7 +51,7 @@ Adding a new setting means adding one static member. Default lives next to the n
 
 - Primitives (`Int`, `String`, `Bool`, `Double`) round-trip directly.
 - `RawRepresentable` enums (`ActivationMode`) encode as their raw value.
-- `[String]` for the custom dictionary.
+- `[String]` for the custom dictionary (the key is reserved, consumer-less since the [0008](../planning/0008_custom-dictionary-redesign.md) cut).
 - Anything else is a deliberate addition — extend the encode/decode logic in `SettingsStore` itself, not at the call site.
 
 **The benefit:** `FreeFlowSession.subscribeToConfiguration()` looks like this:
@@ -83,7 +83,7 @@ This works because `@AppStorage` reads and writes `UserDefaults.standard` direct
 
 This is the only acceptable form. Inline string literals for `UserDefaults` keys outside `Settings.*` declarations are an anti-pattern; see [../conventions/anti-patterns.md](../conventions/anti-patterns.md).
 
-**`@AppStorage` type limit.** `@AppStorage` only binds `Bool` / `Int` / `Double` / `String` / `URL` / `Data` / `RawRepresentable`. A setting whose type it can't represent — notably `[String]` (the custom dictionary) — binds through the typed `SettingsStore` from SwiftUI instead: the view reads `store.value(for:)` and writes `store.setValue(_:for:)`, usually via a small `@Observable` model (the way [`AppState`](app-state-and-menu-bar.md) bridges the session to the menu bar). The "key name in exactly two places" rule still holds for `@AppStorage`-bound keys; a typed-store-bound key simply has no `@AppStorage` annotation and its name lives only in the `SettingKey`.
+**`@AppStorage` type limit.** `@AppStorage` only binds `Bool` / `Int` / `Double` / `String` / `URL` / `Data` / `RawRepresentable`. A setting whose type it can't represent — notably `[String]` (the custom dictionary, whose UI was cut in [0008](../planning/0008_custom-dictionary-redesign.md) but whose key remains the example) — binds through the typed `SettingsStore` from SwiftUI instead: the view reads `store.value(for:)` and writes `store.setValue(_:for:)`, usually via a small `@Observable` model (the way [`AppState`](app-state-and-menu-bar.md) bridges the session to the menu bar). The "key name in exactly two places" rule still holds for `@AppStorage`-bound keys; a typed-store-bound key simply has no `@AppStorage` annotation and its name lives only in the `SettingKey`.
 
 ## What does not belong in SettingsStore
 

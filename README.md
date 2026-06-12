@@ -8,7 +8,6 @@ Free Flow is a free, open-source macOS menu bar dictation app: hold (or tap) a k
 
 - works in any app that accepts paste — Slack, browser, terminal, IDE
 - three activation modes (Hold, Single Tap, Double Tap) on your choice of ten keys
-- custom dictionary for names, jargon, and proper nouns
 - clipboard-safe: full snapshot and restore around every paste
 - 100% on-device — no account, no telemetry, no subscription
 
@@ -23,7 +22,7 @@ Free Flow is a free, open-source macOS menu bar dictation app: hold (or tap) a k
     <td width="50%" align="center">
       <img src="assets/settings.png" alt="Free Flow settings" />
       <br />
-      <sub>Settings: activation key, mode, custom dictionary</sub>
+      <sub>Settings: activation key and mode</sub>
     </td>
   </tr>
 </table>
@@ -68,8 +67,7 @@ The menu bar icon tracks each state of the cycle. Text lands via a synthesized �
 | Activation modes | Hold (push-to-talk), Single Tap, or Double Tap |
 | Configurable key | Ten modifier-key options; default is Right Option |
 | Clipboard safety | Full pasteboard snapshot and restore; a paste guard skips non-editable targets |
-| Custom dictionary | Biases transcription toward your terms ("Vite", not "fight") |
-| Live settings | Key, mode, and dictionary changes apply instantly — no restart |
+| Live settings | Key and mode changes apply instantly — no restart |
 | Guided onboarding | Step-by-step setup for Microphone, Input Monitoring, and Accessibility |
 | Languages | English only for now; multilingual may come later |
 
