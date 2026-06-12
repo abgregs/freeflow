@@ -42,6 +42,73 @@ struct TextInsertionManagerTests {
     }
 
     @MainActor
+    @Test("writePasteboard declares the nspasteboard markers alongside the string")
+    func writePasteboardDeclaresMarkers() {
+        // 0007 acceptance criterion 1, write path 1: the transcription write
+        // carries all three org.nspasteboard marker types, so well-behaved
+        // clipboard managers skip recording the dictation.
+        let manager = TextInsertionManager(accessibility: AccessibilityCapability())
+        let preTestSnapshot = manager.savePasteboard()
+        defer { manager.restorePasteboard(preTestSnapshot) }
+
+        manager.writePasteboard("transcribed")
+
+        let pasteboard = NSPasteboard.general
+        #expect(pasteboard.string(forType: .string) == "transcribed")
+        for type in TextInsertionManager.pasteboardMarkerTypes {
+            #expect(pasteboard.data(forType: type) != nil)
+        }
+    }
+
+    @MainActor
+    @Test("restorePasteboard declares the markers and keeps original bytes")
+    func restorePasteboardDeclaresMarkers() {
+        // 0007 acceptance criterion 1, write path 2: the restore must not be
+        // re-logged by a history manager as a "new" copy — while the user's
+        // original content still round-trips byte-faithful, because markers
+        // are additional types, not replacements.
+        let manager = TextInsertionManager(accessibility: AccessibilityCapability())
+        let preTestSnapshot = manager.savePasteboard()
+        defer { manager.restorePasteboard(preTestSnapshot) }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        let item = NSPasteboardItem()
+        item.setData(Data("hello".utf8), forType: .string)
+        item.setData(Data("<b>hi</b>".utf8), forType: .html)
+        pasteboard.writeObjects([item])
+        let snapshot = manager.savePasteboard()
+
+        manager.restorePasteboard(snapshot)
+
+        #expect(pasteboard.string(forType: .string) == "hello")
+        #expect(pasteboard.data(forType: .html) == Data("<b>hi</b>".utf8))
+        for type in TextInsertionManager.pasteboardMarkerTypes {
+            #expect(pasteboard.data(forType: type) != nil)
+        }
+    }
+
+    @MainActor
+    @Test("restorePasteboard of an empty snapshot writes no marker-only item")
+    func restoreEmptySnapshotStaysEmpty() {
+        // An empty restore is a clear, not a write: stamping markers would
+        // turn a previously empty clipboard into a non-empty one holding a
+        // marker-only item — an observable state change with no privacy
+        // benefit, since there is no content for a manager to record.
+        let manager = TextInsertionManager(accessibility: AccessibilityCapability())
+        let preTestSnapshot = manager.savePasteboard()
+        defer { manager.restorePasteboard(preTestSnapshot) }
+
+        NSPasteboard.general.clearContents()
+        let emptySnapshot = manager.savePasteboard()
+        NSPasteboard.general.setString("clobbered", forType: .string)
+
+        manager.restorePasteboard(emptySnapshot)
+
+        #expect(NSPasteboard.general.pasteboardItems?.isEmpty == true)
+    }
+
+    @MainActor
     @Test("insertText writes text, posts ⌘V via capability, restores pasteboard")
     func insertTextHappyPath() async throws {
         // The cohesive operation: pasteboard ends up with original contents,

@@ -22,6 +22,11 @@ final class TextInsertionManager {
         let items: [[NSPasteboard.PasteboardType: Data]]
     }
 
+    // nspasteboard.org markers declared on both write paths so well-behaved
+    // clipboard managers skip recording them (planning 0007).
+    static let pasteboardMarkerTypes: [NSPasteboard.PasteboardType] =
+        Constants.pasteboardMarkerTypes.map { NSPasteboard.PasteboardType($0) }
+
     private let accessibility: AccessibilityCapability
     private let logger = Logger(subsystem: Constants.loggingSubsystem, category: "insert")
 
@@ -93,6 +98,10 @@ final class TextInsertionManager {
     func restorePasteboard(_ snapshot: PasteboardSnapshot) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
+        // An empty restore is a clear, not a write — stamping markers would
+        // turn a previously empty clipboard into a non-empty one holding a
+        // marker-only item, for no privacy benefit.
+        guard !snapshot.items.isEmpty else { return }
         let items = snapshot.items.map { types -> NSPasteboardItem in
             let item = NSPasteboardItem()
             for (type, data) in types {
@@ -100,13 +109,24 @@ final class TextInsertionManager {
             }
             return item
         }
+        // Markers ride the first item as additional types, not replacements —
+        // the restore stays byte-faithful for the user's content. They keep a
+        // history manager from re-logging the restore as a "new" copy.
+        for type in Self.pasteboardMarkerTypes {
+            items[0].setData(Data(), forType: type)
+        }
         pasteboard.writeObjects(items)
     }
 
-    private func writePasteboard(_ text: String) {
+    // internal for testability — the transcription write path; the 0007 marker
+    // test asserts all three types ride alongside the string.
+    func writePasteboard(_ text: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        for type in Self.pasteboardMarkerTypes {
+            pasteboard.setData(Data(), forType: type)
+        }
     }
 
     // ⌘V: V is virtual keycode 9; the command modifier travels on `.flags` of
