@@ -22,7 +22,7 @@ Settings keys (the target set; declared progressively as their consumers land �
 |---|---|---|---|
 | `activationKeyCode` | `Int` | `Constants.defaultActivationKeyCode` (61, Right Option) | `RiverSession` → `HotkeyManager` |
 | `activationMode` | `ActivationMode` | `Constants.defaultActivationMode` (`.hold`) | `RiverSession` → `HotkeyManager` |
-| `customDictionaryTerms` | `[String]` | `Constants.defaultDictionaryTerms` | `TranscriptionService` |
+| `customDictionaryTerms` | `[String]` | `Constants.defaultDictionaryTerms` | *none in V1 — key reserved for the dictionary redesign ([0008](../planning/0008_custom-dictionary-redesign.md))* |
 | `selectedModel` | `String` | `Constants.defaultModel` | `TranscriptionService` |
 | `launchAtLogin` | `Bool` | `false` | `SettingsView` → `SMAppService` |
 | `pauseMediaWhileDictating` | `Bool` | `true` | `MediaPauseManager` |
@@ -47,7 +47,7 @@ Live-apply is a structural property of [`RiverSession`](river-session.md), not a
 
 ## Not every setting flows through the session
 
-Only **cycle-timing-sensitive** settings (the activation key/mode → `HotkeyManager`) go through `RiverSession`'s apply-or-defer path, because changing them mid-recording would tear down the event tap. Settings that aren't cycle-timed are wired at the app level instead: `AppDelegate` subscribes `Settings.customDictionaryTerms` and forwards it to `TranscriptionService.setCustomDictionaryTerms` (the dictionary is read at the *next* transcription, so it needs no deferral), and `launchAtLogin` is handled in the Settings view's `onChange` via `SMAppService`. The rule: route a setting through the session only if applying it mid-cycle would corrupt the cycle.
+Only **cycle-timing-sensitive** settings (the activation key/mode → `HotkeyManager`) go through `RiverSession`'s apply-or-defer path, because changing them mid-recording would tear down the event tap. Settings that aren't cycle-timed are wired at the app level instead: `launchAtLogin` is handled in the Settings view's `onChange` via `SMAppService`. (`customDictionaryTerms` followed this app-level pattern — `AppDelegate` forwarded it to `TranscriptionService` — until the V1 cut in [0008](../planning/0008_custom-dictionary-redesign.md); the key is declared but currently has no consumer.) The rule: route a setting through the session only if applying it mid-cycle would corrupt the cycle.
 
 ## Reconfiguration keeps the one running tap
 
