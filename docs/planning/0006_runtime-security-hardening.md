@@ -32,15 +32,15 @@ this) and verify on-device, not just in tests:
 ## Accepted trade-offs (by design — do not "fix" casually)
 
 - **Dictations transit the system pasteboard** (a ~250 ms window plus the paste
-  itself). Any process can read the pasteboard during that window, and
-  clipboard-history managers will persist every dictation. **Why accepted:**
-  paste-via-⌘V is the only universal insertion mechanism; AX writes were
-  rejected (see "No AX-API path" in
+  itself). Any process polling the pasteboard during that window can still read
+  it. Both writes now carry the nspasteboard.org transient/concealed markers
+  ([0007_transient-pasteboard-markers.md](0007_transient-pasteboard-markers.md),
+  landed 2026-06-12), so well-behaved clipboard managers skip recording
+  dictations; a manager that ignores the voluntary convention may still persist
+  them. **Why accepted:** paste-via-⌘V is the only universal insertion
+  mechanism; AX writes were rejected (see "No AX-API path" in
   [../architecture/free-flow-pipeline.md](../architecture/free-flow-pipeline.md)).
-  The README carries the user-facing caveat. Planned upgrade:
-  [0007_transient-pasteboard-markers.md](0007_transient-pasteboard-markers.md)
-  marks both writes so well-behaved clipboard managers stop recording
-  dictations.
+  The README carries the user-facing caveat, reworded for the markers.
 - **The model cache is trusted without verification.** WhisperKit's cache under
   `~/Documents/huggingface/` is user-writable and the app loads whatever is
   there. **Why accepted:** a same-user attacker is outside the security

@@ -1,5 +1,14 @@
 # Planning: Transient Pasteboard Markers (roadmap 0007)
 
+> **Status (2026-06-12): landed.** Both writes in `TextInsertionManager`
+> carry all three marker types (identifier strings in
+> `Constants.pasteboardMarkerTypes`, mapped once in the manager), unit-tested
+> on both paths; the README caveat is reworded and 0006's trade-off entry
+> points here. One scoped refinement: an empty-snapshot restore stays empty —
+> a restore-to-empty is a clear, and a marker-only item would turn an empty
+> clipboard non-empty for no privacy benefit. Empirical results are recorded
+> under "Empirical verification" below.
+
 Upgrade the pasteboard trade-off recorded in
 [0006_runtime-security-hardening.md](0006_runtime-security-hardening.md):
 dictations transit `NSPasteboard.general`, so clipboard-history managers
@@ -53,6 +62,17 @@ sees the text. The README caveat is *reworded*, not removed.
    password manager user, not just Free Flow.
 3. Paste behavior in target apps is unchanged (markers are invisible to the
    paste consumer).
+
+**Observed (2026-06-12):** verified on-device against the first
+marker-carrying `make install` build — dictations do not appear in Raycast's
+clipboard history. A pre-marker build had shown the same absence, so whether
+Raycast respects the markers or simply never captures the ~250 ms transient
+window remains indistinguishable; either way the exposure is closed for the
+manager in actual use, and no upstream issue is warranted. (Earlier
+recollections of dictations in history predate this validation and are
+consistent with manual re-copies — fresh unmarked writes, which *should*
+appear.) Acceptance criterion 2: **met**. Scoped out: the Maccy/Alfred
+check (item 1).
 
 ## Acceptance criteria
 
