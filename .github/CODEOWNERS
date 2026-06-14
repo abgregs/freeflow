@@ -1,0 +1,5 @@
+# Every change requires review from the maintainer. Paired with the `main`
+# branch ruleset's "require code-owner review", this makes @abgregs's approval
+# a merge gate for all pull requests (including fork PRs from contributors).
+# See docs/conventions/git.md and docs/planning/0005_release-pipeline-security.md.
+* @abgregs

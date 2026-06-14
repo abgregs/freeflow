@@ -64,7 +64,8 @@ No emoji. No co-author trailers from tools. No `chore: misc updates` style commi
 
 - Only PR merges, via **merge commit** — each PR lands as an explicit `Merge pull request #N` commit with the branch's conventional commits preserved beneath it. **Why:** replaces the rebase-merge convention previously recorded here — PRs #2 and #3 merged with merge commits, and the merge bubble keeps PR boundaries visible in history; the doc now matches actual practice.
 - Hotfixes follow the same PR flow, just on a `hotfix/` branch.
-- Direct push to `main` is permanently disabled in repo settings.
+- `main` is protected by a repository **ruleset** (not classic branch protection): a PR is required to land changes, force-pushes and branch deletion are blocked, and merging requires **code-owner review** — the maintainer's approval, via [`.github/CODEOWNERS`](../../.github/CODEOWNERS) (`* @abgregs`). The maintainer is the only account with write access, so they are also the only one who can press merge; fork contributors can open PRs but cannot merge them. **Why admin bypass exists:** GitHub forbids approving your own PR, so the repository-admin role is a ruleset bypass actor — without it the maintainer's own PRs would deadlock against the code-owner requirement. The bypass only affects the maintainer's own actions; external PRs are still gated on the maintainer's approval.
+- Release tags (`v*`) are protected by a separate ruleset: deletion and force-push are blocked (no bypass), keeping released tags immutable per [../planning/0005_release-pipeline-security.md](../planning/0005_release-pipeline-security.md). Creation stays open so releases can be tagged.
 
 ## Tags and releases
 
