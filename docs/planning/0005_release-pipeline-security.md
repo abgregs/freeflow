@@ -58,7 +58,12 @@ part of the attack surface; its integrity guarantees are a feature.
 2. A released `.dmg`'s checksum matches both the published SHA-256 and the
    cask's `sha256`.
 3. Tag and branch protection are verified in repository settings after the repo
-   goes public.
+   goes public. **Status (2026-06-14):** done ahead of the pipeline — the repo
+   is already public, so the "once public" hardening landed now: `main` and `v*`
+   tag rulesets are active (see [../conventions/git.md](../conventions/git.md)),
+   and private vulnerability reporting is enabled (backing the promise in
+   [SECURITY.md](../../SECURITY.md)). The workflow-hardening and secrets items
+   above still gate the M11 Action itself.
 
 ## Related
 
