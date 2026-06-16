@@ -3,6 +3,9 @@ BUNDLE_ID := com.river.app
 SIGN_IDENTITY := River Dev
 BUILD_DIR := .build
 APP_BUNDLE := $(BUILD_DIR)/$(APP_NAME).app
+# Extra flags forwarded to `swift build`. Empty for local builds; the release
+# workflow passes `-Xswiftc -DRIVER_RELEASE` to compile out dev-only UI.
+SWIFT_FLAGS ?=
 INFO_PLIST := Sources/River/Resources/Info.plist
 ENTITLEMENTS := Sources/River/Resources/River.entitlements
 INSTALL_DIR := /Applications
@@ -10,7 +13,7 @@ INSTALL_DIR := /Applications
 .PHONY: build bundle sign verify install clean test
 
 build:
-	swift build -c release --arch arm64
+	swift build -c release --arch arm64 $(SWIFT_FLAGS)
 
 bundle: build
 	rm -rf $(APP_BUNDLE)
