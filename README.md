@@ -76,7 +76,7 @@ The menu bar icon tracks each state of the cycle. Text lands via a synthesized â
 Coming with the release milestone:
 
 ```bash
-brew install --cask river
+brew install --cask abgregs/river/river
 ```
 
 Requirements: macOS 14+ on Apple Silicon.
