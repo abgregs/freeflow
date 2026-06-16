@@ -46,15 +46,25 @@ part of the attack surface; its integrity guarantees are a feature.
 
 ### Release-build behavior
 
-- Decide the fate of onboarding's "Skip (I've already granted permissions)"
-  button in notarized release builds: its unsigned-dev-build rationale (see
-  [../requirements/core-feature.md](../requirements/core-feature.md)) doesn't
-  apply to a notarized app.
+- **Resolved (2026-06-15):** the onboarding "Skip (I've already granted
+  permissions)" button is **hidden in notarized builds** and kept in
+  local/self-signed builds, gated by the `FREEFLOW_RELEASE` compile condition
+  the release workflow sets (`-Xswiftc -DFREEFLOW_RELEASE`). Its rationale —
+  unreliable TCC detection on unsigned dev builds (see
+  [../requirements/core-feature.md](../requirements/core-feature.md)) — doesn't
+  apply to a notarized app, where stable-signature detection is reliable and a
+  Skip would only let a user bypass a still-required permission.
 
 ## Acceptance criteria
 
 1. The M11 workflow file passes review against every item above before the
-   first public tag is pushed.
+   first public tag is pushed. **Status (2026-06-15):** the workflow
+   ([../../.github/workflows/release.yml](../../.github/workflows/release.yml))
+   is drafted to satisfy every checklist item — SHA-pinned action,
+   least-privilege `permissions`, ephemeral keychain with always-run teardown,
+   `Package.resolved` provenance, SHA-256 artifact. It has not yet run (pending
+   enrollment + secrets); first-run review on a `v*` tag closes this. See the
+   [release-pipeline runbook](../architecture/release-pipeline.md).
 2. A released `.dmg`'s checksum matches both the published SHA-256 and the
    cask's `sha256`.
 3. Tag and branch protection are verified in repository settings after the repo

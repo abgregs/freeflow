@@ -38,7 +38,7 @@ AppDelegate (lifecycle only)              │
 Free Flow is open-source. Users fall into three groups:
 
 1. **Devs** — clone, run `swift build`, install via `make install` or the bundled script.
-2. **Power users** — `brew install --cask freeflow`.
+2. **Power users** — `brew install --cask abgregs/freeflow/freeflow` (from the `abgregs/homebrew-freeflow` tap).
 3. **General users** — download a signed `.dmg` from GitHub Releases, drag to `/Applications`.
 
 The app is **not** distributed via the Mac App Store. **Why:** the App Store sandbox forbids global event taps, which would force a fundamentally different (and worse) architecture for the activation hotkey. See [distribution.md](distribution.md). The capability layer makes a future port less catastrophic — `InputMonitoringCapability` is the seam where a sandbox-safe alternative would substitute.

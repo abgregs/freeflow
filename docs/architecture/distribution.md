@@ -5,7 +5,7 @@ Three channels, two signing identities, one stable bundle ID.
 ## Channels
 
 1. **Source build** (devs) — clone, run `swift build`, install via the Makefile target. Local-signed.
-2. **Homebrew cask** (power users) — `brew install --cask freeflow` pulls the latest signed `.dmg`.
+2. **Homebrew cask** (power users) — `brew install --cask abgregs/freeflow/freeflow` (from the `abgregs/homebrew-freeflow` tap) pulls the latest signed `.dmg`.
 3. **GitHub Releases `.dmg`** (general users) — signed and notarized, drag-to-`/Applications`.
 
 The App Store is intentionally not a channel. **Why:** the sandbox forbids global event taps, which would require redesigning the activation hotkey around a much weaker mechanism. See [overview.md](overview.md).
@@ -58,9 +58,9 @@ The sandbox is intentionally off (see [permissions.md](permissions.md)), so the 
 
 ## Releases
 
-- Tag a release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-- A GitHub Action (TODO) builds the release `.app`, signs with Developer ID, notarizes via `xcrun notarytool`, staples, packages as `.dmg`, and attaches to the release.
-- The Homebrew cask points at the release URL.
+- Tag a release: `git tag vX.Y.Z && git push origin vX.Y.Z`. `v*` tags are protected — deletion and force-push are blocked (see [../conventions/git.md](../conventions/git.md)).
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) builds the tagged commit, signs with Developer ID (reusing `make` so the bundle-integrity check from [anti-pattern #3](../conventions/anti-patterns.md) runs on the release build too), notarizes the app and the DMG via `xcrun notarytool`, staples both, and publishes the `.dmg` + a SHA-256 checksum to the GitHub Release. Required secrets, one-time setup, and how to cut a release are in the [release-pipeline runbook](release-pipeline.md). *(Drafted; not yet run — pending Developer Program enrollment.)*
+- The Homebrew cask ([`../../packaging/homebrew/freeflow.rb`](../../packaging/homebrew/freeflow.rb)) points at the release `.dmg` and pins its published `sha256`.
 
 ## Related
 

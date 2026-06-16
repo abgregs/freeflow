@@ -12,6 +12,10 @@ Two stores. Different responsibilities. Mixing them is the bug.
 
 **Rule:** if a user could plausibly want to change it from Settings, it does not live here. Constants is read at startup; nothing observes it. See [../conventions/anti-patterns.md](../conventions/anti-patterns.md).
 
+## Build-variant compile flags (neither store)
+
+A third category is neither a `Constants` value nor a `SettingKey`: the `FREEFLOW_RELEASE` Swift compile condition, set only by the [release pipeline](release-pipeline.md) (`make … SWIFT_FLAGS="-Xswiftc -DFREEFLOW_RELEASE"`). It selects between **build variants** rather than configuring behavior at runtime — its only use today is compiling out the dev-only onboarding Skip button in notarized builds (see [permissions.md](permissions.md)). Reach for a compile flag only when the difference is genuinely build-time (local/self-signed vs. notarized) and must *not* be a runtime toggle; user-facing behavior still belongs in `SettingsStore`.
+
 ## `SettingsStore` — runtime configuration
 
 Anything the user can change from Settings flows through [`SettingsStore`](settings-store.md). The store wraps `UserDefaults.standard` behind typed keys and per-key publishers.

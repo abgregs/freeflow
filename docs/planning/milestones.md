@@ -4,7 +4,7 @@ Ordered. Each milestone is a state the project can pause at without being broken
 
 **These eleven milestones are the project's initial build-out — a one-time scaffolding sprint to a usable, shippable V1, not an open-ended backlog.** M1–M3 establish the architectural skeleton (bundle pipeline, capability layer, dictation session) before any feature code; M4–M9 fill the session interior (the full hold/tap → capture → transcribe → paste cycle plus settings); M10–M11 ship it (local install, then public release). **M11 is the finish line: once it lands the app is at V1, and everything after builds on this foundation** — tracked as the numbered backlog in [_index.md](_index.md) (`0001_`, `0002_`, …), not as new M-numbers.
 
-**Status (as of M9):** M1–M9 are complete; M10–M11 (distribution + release) remain. The app is already functionally usable — the rest is about shipping it to others.
+**Status (as of 2026-06-15):** M1–M10 are complete; **M11 (public release) is in progress** — the pipeline is drafted (signing, notarization, DMG, checksum, Homebrew cask) and is blocked only on Apple Developer Program enrollment for the Developer ID cert + notary credentials. The app is functionally usable; the remaining work is shipping the notarized artifact.
 
 ## M1: Walking skeleton
 
@@ -64,11 +64,11 @@ Exit criteria: tests for state machine cover single-tap, double-tap within windo
 
 Makefile target that does `swift build -c release`, assembles the bundle (`Info.plist` + entitlements), installs to `/Applications`, and signs with the local "Free Flow Dev" identity. README documents the one-time keychain certificate setup. Bundle assembly is verified with `codesign -dv` before install completes.
 
-Exit criteria: `make install` produces a working `/Applications/FreeFlow.app` that survives across rebuilds without re-granting permissions. The bundle-misidentification failure mode is detected by `AccessibilityCapability` at runtime if it ever occurs.
+Exit criteria: `make install` produces a working `/Applications/FreeFlow.app` that survives across rebuilds without re-granting permissions. The bundle-misidentification failure mode is detected by `AccessibilityCapability` at runtime if it ever occurs. **Complete** — the Makefile build→bundle→sign→verify→install flow is in daily use.
 
 ## M11: Public release pipeline
 
-GitHub Action: on tag, build with Developer ID signing, notarize via `notarytool`, staple, package as `.dmg`, attach to release. Homebrew cask in a separate `homebrew-freeflow` tap repo pointing at the release artifact. The workflow must satisfy the security checklist in [0005_release-pipeline-security.md](0005_release-pipeline-security.md).
+GitHub Action: on tag, build with Developer ID signing, notarize via `notarytool`, staple, package as `.dmg`, attach to release. Homebrew cask in a separate `homebrew-freeflow` tap repo pointing at the release artifact. The workflow must satisfy the security checklist in [0005_release-pipeline-security.md](0005_release-pipeline-security.md). **In progress (2026-06-15):** the workflow, DMG script, and cask are drafted (see [../architecture/release-pipeline.md](../architecture/release-pipeline.md)); blocked on Developer Program enrollment for the signing cert + notary credentials.
 
 Exit criteria: `git tag v0.1.0 && git push origin v0.1.0` results in a downloadable signed/notarized `.dmg` on the GitHub release page within 10 minutes, and the workflow passes review against [0005_release-pipeline-security.md](0005_release-pipeline-security.md).
 
