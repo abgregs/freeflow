@@ -12,3 +12,4 @@ How Free Flow is structured and why. Read in order on a first pass; reference in
 - [permissions.md](permissions.md) — Accessibility, Microphone, Input Monitoring; what they're for; what the user must grant manually
 - [configuration.md](configuration.md) — `Constants` vs. `SettingsStore`; live-apply via session subscription
 - [distribution.md](distribution.md) — signed `.app` bundle, DMG, Homebrew cask; the role of the developer signing identity vs. the local dev identity
+- [release-pipeline.md](release-pipeline.md) — the `v*`-tag GitHub Action that builds, signs, notarizes, and publishes a release DMG + checksum; required secrets and how to cut a release

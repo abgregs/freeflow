@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Package a signed FreeFlow.app into a distributable DMG.
+#
+# Uses hdiutil (built into macOS) rather than a Homebrew tool so the release
+# pipeline keeps the same "Xcode Command Line Tools only" footprint as the
+# local build. Prints the produced DMG path on stdout so the workflow can
+# capture it.
+#
+#   scripts/make-dmg <app-path> <version> [signing-identity]
+set -euo pipefail
+
+APP_PATH="${1:?usage: make-dmg <app-path> <version> [signing-identity]}"
+VERSION="${2:?usage: make-dmg <app-path> <version> [signing-identity]}"
+IDENTITY="${3:-}"
+
+OUT="FreeFlow-${VERSION}.dmg"
+STAGING="$(mktemp -d)"
+trap 'rm -rf "$STAGING"' EXIT
+
+# Standard drag-install layout: the app plus a symlink to /Applications.
+cp -R "$APP_PATH" "$STAGING/"
+ln -s /Applications "$STAGING/Applications"
+
+rm -f "$OUT"
+hdiutil create \
+  -volname "Free Flow" \
+  -srcfolder "$STAGING" \
+  -fs HFS+ \
+  -format UDZO \
+  -ov \
+  "$OUT" >/dev/null
+
+# Sign the DMG itself with Developer ID when an identity is supplied (release
+# path). Omitted for a quick unsigned local DMG.
+if [ -n "$IDENTITY" ]; then
+  codesign --force --sign "$IDENTITY" "$OUT" >/dev/null
+fi
+
+echo "$OUT"

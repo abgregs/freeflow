@@ -31,7 +31,7 @@ On every launch the onboarding gate checks every [Capability](../architecture/ca
 
 A `Refresh permission status` button calls `recheck()` on every capability without restarting the app.
 
-A `Skip (I've already granted permissions)` button exists for unsigned dev builds where detection can be unreliable. **Why:** see [../architecture/permissions.md](../architecture/permissions.md). Skip bypasses the onboarding gate but does not silence individual capability checks — if a capability refuses an action at runtime, the failure still surfaces in the UI.
+A `Skip (I've already granted permissions)` button exists in local/self-signed dev builds, where detection can be unreliable — it is **compiled out of notarized release builds** via the `FREEFLOW_RELEASE` flag (see [../planning/0005_release-pipeline-security.md](../planning/0005_release-pipeline-security.md)), because a notarized app has reliable detection and a Skip would only let a user bypass a still-required permission. **Why it exists at all:** see [../architecture/permissions.md](../architecture/permissions.md). Skip bypasses the onboarding gate but does not silence individual capability checks — if a capability refuses an action at runtime, the failure still surfaces in the UI.
 
 ## Non-requirements (deliberately out of scope)
 

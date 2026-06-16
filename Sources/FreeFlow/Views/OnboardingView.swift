@@ -32,7 +32,14 @@ struct OnboardingView: View {
                     }
                 }
                 Spacer()
+                // Dev-build escape hatch only: on self-signed builds TCC
+                // detection can read `.unknown` even when grants are in place,
+                // which would trap the user in onboarding. A notarized build has
+                // reliable detection, so the release pipeline compiles this out
+                // (see docs/planning/0005_release-pipeline-security.md).
+                #if !FREEFLOW_RELEASE
                 Button("Skip (I've already granted permissions)", action: onSkip)
+                #endif
             }
         }
         .padding(24)

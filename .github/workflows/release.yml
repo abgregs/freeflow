@@ -1,0 +1,145 @@
+name: Release
+
+# Cuts a signed, notarized DMG on a version tag and attaches it (plus a
+# SHA-256) to the GitHub Release. The Homebrew cask points at that artifact.
+# Setup, required secrets, and how to cut a release live in
+# docs/architecture/release-pipeline.md. Satisfies the 0005 security checklist.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Least privilege: only the permission needed to upload release assets.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14   # Apple Silicon (arm64) runner with the Swift toolchain
+    env:
+      APP_NAME: FreeFlow
+
+    steps:
+      # Pinned to a full commit SHA per 0005 (workflow hardening).
+      # NOTE: verify this SHA still maps to a trusted actions/checkout release
+      # before the first real run.
+      - name: Check out the tagged commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Derive and validate version from tag
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Accept vX.Y.Z (release) or vX.Y.Z-suffix (pre-release / test tag).
+          # Fail fast so a malformed tag never reaches signing or notarization.
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' is not a valid version — expected vX.Y.Z or vX.Y.Z-suffix."
+            exit 1
+          fi
+          # CFBundleShortVersionString must be numeric X.Y.Z, so the plist gets
+          # the core; the full tag (with any suffix) names the release + DMG.
+          VERSION_CORE="${VERSION%%-*}"
+          PRERELEASE=false
+          if [[ "$VERSION" == *-* ]]; then PRERELEASE=true; fi
+          { echo "VERSION=$VERSION"; echo "VERSION_CORE=$VERSION_CORE"; echo "PRERELEASE=$PRERELEASE"; } >> "$GITHUB_ENV"
+          echo "Release $VERSION (core $VERSION_CORE, prerelease=$PRERELEASE) from $GITHUB_REF_NAME"
+
+      # The tag is the single source of truth for the version (0005 build
+      # provenance — build the tagged commit only, no arbitrary inputs).
+      - name: Stamp version into Info.plist
+        run: |
+          set -euo pipefail
+          PLIST=Sources/FreeFlow/Resources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION_CORE" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" "$PLIST"
+
+      # Secrets land only in an ephemeral keychain, torn down on exit (0005).
+      - name: Import Developer ID certificate into an ephemeral keychain
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          set -euo pipefail   # deliberately NO `set -x` — never trace secrets
+          KEYCHAIN="$RUNNER_TEMP/freeflow-signing.keychain-db"
+          KEYCHAIN_PW="$(uuidgen)"
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          CERT="$RUNNER_TEMP/developer_id.p12"
+          printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 --decode > "$CERT"
+          security import "$CERT" -k "$KEYCHAIN" -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/"//g')
+          rm -f "$CERT"
+
+      # Reuse the Makefile so anti-pattern #3's bundle-integrity check
+      # (codesign -dv asserts Identifier=com.freeflow.app) runs on the release
+      # build too. SWIFT_FLAGS sets the FREEFLOW_RELEASE compile condition that
+      # hides the dev-only onboarding Skip button.
+      - name: Build, bundle, sign, verify
+        env:
+          SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          make verify SIGN_IDENTITY="$SIGNING_IDENTITY" SWIFT_FLAGS="-Xswiftc -DFREEFLOW_RELEASE"
+
+      - name: Decode notary API key
+        env:
+          NOTARY_API_KEY_BASE64: ${{ secrets.NOTARY_API_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          KEY="$RUNNER_TEMP/notary_key.p8"
+          printf '%s' "$NOTARY_API_KEY_BASE64" | base64 --decode > "$KEY"
+          echo "NOTARY_KEY=$KEY" >> "$GITHUB_ENV"
+
+      - name: Notarize and staple the app
+        env:
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          APP=".build/$APP_NAME.app"
+          ZIP="$RUNNER_TEMP/$APP_NAME.zip"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          xcrun notarytool submit "$ZIP" \
+            --key "$NOTARY_KEY" --key-id "$NOTARY_API_KEY_ID" --issuer "$NOTARY_API_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$APP"
+          rm -f "$ZIP"
+
+      - name: Package, sign, notarize, and staple the DMG
+        env:
+          SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          DMG="$(scripts/make-dmg ".build/$APP_NAME.app" "$VERSION" "$SIGNING_IDENTITY")"
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+          xcrun notarytool submit "$DMG" \
+            --key "$NOTARY_KEY" --key-id "$NOTARY_API_KEY_ID" --issuer "$NOTARY_API_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$DMG"
+
+      # Artifact integrity (0005): publish a SHA-256 next to the DMG. Releases
+      # are immutable — never re-upload under an existing tag; fix forward.
+      - name: Checksum and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shasum -a 256 "$DMG" > "$DMG.sha256"
+          # A suffixed tag (e.g. v0.0.1-rc1) publishes as a pre-release — the
+          # safe way to exercise the pipeline without minting a "real" release.
+          args=( "$GITHUB_REF_NAME" "$DMG" "$DMG.sha256" --title "$GITHUB_REF_NAME" --generate-notes )
+          if [ "$PRERELEASE" = "true" ]; then args+=( --prerelease ); fi
+          gh release create "${args[@]}"
+
+      # Runs even on failure: no signing material survives the job (0005).
+      - name: Tear down signing material
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/notary_key.p8" "$RUNNER_TEMP/developer_id.p12" 2>/dev/null || true
