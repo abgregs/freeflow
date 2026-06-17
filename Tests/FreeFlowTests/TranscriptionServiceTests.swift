@@ -20,6 +20,21 @@ struct TranscriptionServiceGateTests {
     }
 }
 
+@Suite("TranscriptionService model cache location")
+struct TranscriptionCacheLocationTests {
+    // The model must download under Application Support, never ~/Documents —
+    // Documents is TCC-protected, so downloading there triggers a Documents-folder
+    // prompt and clutters the user's Documents (planning 0010). This pins the
+    // location so a regression to WhisperKit's ~/Documents default fails loudly.
+    @MainActor
+    @Test("modelDownloadBase resolves under Application Support, not Documents")
+    func downloadBaseUnderApplicationSupport() {
+        let path = TranscriptionService.modelDownloadBase().path
+        #expect(path.contains("/Library/Application Support/\(Constants.modelCacheFolderName)"))
+        #expect(!path.contains("/Documents"))
+    }
+}
+
 @Suite("TranscriptionService prompt-token filter")
 struct TranscriptionFilterTests {
     // The custom-dictionary prompt feeds raw token IDs into WhisperKit's

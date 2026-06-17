@@ -20,6 +20,7 @@ Planning lives in three layers:
 - [0007_transient-pasteboard-markers.md](0007_transient-pasteboard-markers.md) — **landed 2026-06-12**: both pasteboard writes carry the nspasteboard.org transient/concealed types so well-behaved clipboard managers stop recording dictations; upgrades 0006's pasteboard trade-off
 - [0008_custom-dictionary-redesign.md](0008_custom-dictionary-redesign.md) — cut the V1 dictionary UI (prompt-echo bug pastes unspoken terms; 224-token ceiling blocks role packs) and redesign as two tiers: budgeted prompt biasing + deterministic post-processing with role packs. **The removal task landed 2026-06-12; the redesign remains queued.**
 - [0009_sparkle-auto-update.md](0009_sparkle-auto-update.md) — add the Sparkle framework for in-app "Update available" notifications on the DMG channel; the release workflow publishes a signed appcast per tag. Closes the V1 update gap.
+- [0010_relocate-model-cache.md](0010_relocate-model-cache.md) — **landing before v0.1.0**: download the WhisperKit model under `~/Library/Application Support/FreeFlow` instead of WhisperKit's `~/Documents` default, so first launch doesn't trigger a Documents-folder TCC prompt or clutter the user's Documents.
 
 Detailed specs for individual items live in their own files — a milestone (like [walking-skeleton.md](walking-skeleton.md) for M1) or a backlog item (the `NNNN_` files). The `NNNN_` prefix sorts the backlog roughly by intended order, not a strict queue.
 

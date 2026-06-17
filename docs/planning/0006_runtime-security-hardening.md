@@ -42,8 +42,10 @@ this) and verify on-device, not just in tests:
   [../architecture/free-flow-pipeline.md](../architecture/free-flow-pipeline.md)).
   The README carries the user-facing caveat, reworded for the markers.
 - **The model cache is trusted without verification.** WhisperKit's cache under
-  `~/Documents/huggingface/` is user-writable and the app loads whatever is
-  there. **Why accepted:** a same-user attacker is outside the security
+  `~/Library/Application Support/FreeFlow/` (relocated from the `~/Documents`
+  default — see [0010_relocate-model-cache.md](0010_relocate-model-cache.md)) is
+  user-writable and the app loads whatever is there. **Why accepted:** a
+  same-user attacker is outside the security
   boundary (they can already keylog or exfiltrate directly), and a poisoned
   *transcription model* can only emit text the user watches get pasted.
   Transport integrity is HTTPS to Hugging Face. Optional follow-up at release

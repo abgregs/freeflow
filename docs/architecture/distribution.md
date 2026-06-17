@@ -52,7 +52,7 @@ Prefer using `xcodebuild` or `swift build` plus a tightly verified bundle-assemb
 
 ## WhisperKit model cache
 
-First launch downloads the model identified by `Constants.defaultModel` (currently `openai_whisper-small.en`, ~240 MB) to WhisperKit's cache directory (`~/Documents/huggingface/models/argmaxinc/whisperkit-coreml/<model>`). Subsequent launches reuse the cached copy — only the first run sees the download cost.
+First launch downloads the model identified by `Constants.defaultModel` (currently `openai_whisper-small.en`, ~240 MB) to `~/Library/Application Support/FreeFlow/models/argmaxinc/whisperkit-coreml/<model>` (set via WhisperKit's `downloadBase`). Subsequent launches reuse the cached copy — only the first run sees the download cost. **Application Support, not WhisperKit's `~/Documents/huggingface` default:** Documents is TCC-protected, so downloading there triggers an "access your Documents folder" prompt and clutters the user's Documents — see [../planning/0010_relocate-model-cache.md](../planning/0010_relocate-model-cache.md).
 
 The sandbox is intentionally off (see [permissions.md](permissions.md)), so the cache lives outside the app container and survives reinstalls. This is the **only** network behaviour in the app (see [../requirements/core-feature.md](../requirements/core-feature.md) item 6).
 

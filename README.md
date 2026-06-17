@@ -58,7 +58,7 @@ flowchart LR
 The menu bar icon tracks each state of the cycle. Text lands via a synthesized ⌘V, and your previous clipboard — rich text and images included — is restored immediately after. Both clipboard writes are marked transient and concealed (the [nspasteboard.org](http://nspasteboard.org) convention), which well-behaved clipboard managers respect; managers that ignore the convention may still record dictations.
 
 > [!NOTE]
-> First launch downloads the default model (~240 MB) from Hugging Face. Every launch and dictation after that is fully offline.
+> First launch downloads the default model (~240 MB) from Hugging Face into `~/Library/Application Support/FreeFlow`. Every launch and dictation after that is fully offline.
 
 ## Features
 

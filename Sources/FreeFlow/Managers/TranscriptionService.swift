@@ -43,6 +43,15 @@ final class TranscriptionService {
         self.modelName = modelName
     }
 
+    // internal for testability — the model download root. Application Support
+    // (not WhisperKit's ~/Documents default) so model downloads never trip the
+    // Documents-folder TCC prompt (planning 0010). Pure (no I/O); `loadModel`
+    // creates the directory.
+    static func modelDownloadBase() -> URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent(Constants.modelCacheFolderName, isDirectory: true)
+    }
+
     /// Idempotent. AppDelegate kicks this off as fire-and-forget at launch.
     /// Coalesces concurrent callers onto the same `Task` so a second `loadModel`
     /// while the first is in-flight doesn't start a second download.
@@ -55,13 +64,19 @@ final class TranscriptionService {
         logger.info("Loading WhisperKit model \(self.modelName, privacy: .public)")
         let modelName = self.modelName
         let task = Task<WhisperKit, Error> {
+            // Download under Application Support, not WhisperKit's default of
+            // ~/Documents/huggingface — Documents is TCC-protected, so the default
+            // triggers a "FreeFlow wants to access Documents" prompt and clutters
+            // the user's Documents (planning 0010).
+            let downloadBase = Self.modelDownloadBase()
+            try FileManager.default.createDirectory(at: downloadBase, withIntermediateDirectories: true)
             // `load: true` is required: without it (and without a `modelFolder`),
             // WhisperKit's init downloads but does NOT call `loadModels()`, so the
             // encoder/decoder/tokenizer stay nil until the first `transcribe`
             // lazy-loads them. That broke two things: the "model loads at launch"
             // guarantee, and the custom dictionary — `buildPromptTokens` read a nil
             // `tokenizer` and silently produced an empty prompt.
-            try await WhisperKit(model: modelName, load: true)
+            return try await WhisperKit(model: modelName, downloadBase: downloadBase, load: true)
         }
         loadTask = task
         do {

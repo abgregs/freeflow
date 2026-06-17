@@ -4,6 +4,12 @@ enum Constants {
     static let bundleIdentifier = "com.freeflow.app"
     static let loggingSubsystem = "com.freeflow.app"
 
+    // Subfolder under ~/Library/Application Support holding the downloaded
+    // WhisperKit model. Application Support (not WhisperKit's ~/Documents
+    // default) keeps model downloads from tripping the Documents-folder TCC
+    // prompt. See planning/0010_relocate-model-cache.md.
+    static let modelCacheFolderName = "FreeFlow"
+
     // Right Option — universal on all Mac keyboards (including MacBook and
     // Magic Keyboard) and rarely pressed during typing, so Hold mode doesn't
     // accidentally trigger on capitalization or shortcuts. `@AppStorage` does

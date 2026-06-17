@@ -8,7 +8,7 @@ import Foundation
 /// into a log line in the first place — only a `.count` is (see
 /// `conventions/logging.md`). The remaining leak is contextual: an opaque
 /// third-party or OS `error.localizedDescription` can embed a filesystem path
-/// like `/Users/<name>/Documents/huggingface/...`, which carries the macOS
+/// like `/Users/<name>/Library/Application Support/FreeFlow/...`, which carries the macOS
 /// account name. `redactUserPaths` removes it so error strings stay safe to log
 /// publicly — keeping the *reason* a failure happened visible in field bug
 /// reports without exposing who the user is. See
