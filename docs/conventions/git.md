@@ -69,9 +69,8 @@ No emoji. No co-author trailers from tools. No `chore: misc updates` style commi
 
 ## Tags and releases
 
-- Releases are tagged `vMAJOR.MINOR.PATCH` from `main`.
-- A GitHub Action (TODO) reads the tag, builds the signed/notarized release, and attaches it.
-- See [../architecture/distribution.md](../architecture/distribution.md) for the release pipeline.
+- Releases are tagged `vMAJOR.MINOR.PATCH` from `main`; pushing the tag triggers [`.github/workflows/release.yml`](../../.github/workflows/release.yml), which builds, signs, notarizes, and publishes. `v*` tags are immutable (protected — see above).
+- Versioning rules, pre-release tags, the two macOS version fields, and per-channel update behavior live in [versioning-and-releases.md](versioning-and-releases.md); pipeline setup is the [release-pipeline runbook](../architecture/release-pipeline.md).
 
 ## Related
 
