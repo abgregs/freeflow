@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-14   # Apple Silicon (arm64) runner with the Swift toolchain
+    runs-on: macos-15   # Apple Silicon (arm64); carries a Swift 6.x toolchain (deps need >= 6.2)
     env:
       APP_NAME: FreeFlow
 
@@ -26,6 +26,17 @@ jobs:
       # before the first real run.
       - name: Check out the tagged commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      # The runner's default Xcode may ship an older Swift than the
+      # dependencies require (they need tools >= 6.2). Select the newest
+      # non-beta Xcode on the image so `swift build` matches a local build.
+      - name: Select the latest stable Xcode
+        run: |
+          set -euo pipefail
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
+          echo "Selecting $latest"
+          sudo xcode-select -s "$latest/Contents/Developer"
+          swift --version
 
       - name: Derive and validate version from tag
         run: |
