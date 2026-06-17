@@ -62,8 +62,21 @@ The sandbox is intentionally off (see [permissions.md](permissions.md)), so the 
 - [`.github/workflows/release.yml`](../../.github/workflows/release.yml) builds the tagged commit, signs with Developer ID (reusing `make` so the bundle-integrity check from [anti-pattern #3](../conventions/anti-patterns.md) runs on the release build too), notarizes the app and the DMG via `xcrun notarytool`, staples both, and publishes the `.dmg` + a SHA-256 checksum to the GitHub Release. Required secrets, one-time setup, and how to cut a release are in the [release-pipeline runbook](release-pipeline.md). *(Drafted; not yet run — pending Developer Program enrollment.)*
 - The Homebrew cask ([`../../packaging/homebrew/freeflow.rb`](../../packaging/homebrew/freeflow.rb)) points at the release `.dmg` and pins its published `sha256`.
 
+Versioning rules and the tag-driven protocol are in [../conventions/versioning-and-releases.md](../conventions/versioning-and-releases.md).
+
+## Updates
+
+How an installed copy learns about a newer version differs by channel:
+
+- **GitHub Releases `.dmg`** — no built-in update mechanism today; the user must check the Releases page and re-download. This is the weakest update UX and the motivation for [Sparkle](../planning/0009_sparkle-auto-update.md).
+- **Homebrew cask** — pull-based: `brew upgrade` (or `brew upgrade --cask freeflow`) picks up new versions on the user's own schedule; Homebrew never notifies proactively. A release only becomes visible to Homebrew once the cask's `version` + `sha256` are bumped in the tap ([packaging/homebrew](../../packaging/homebrew/README.md)).
+- **Source build** — `git pull` + `make install`.
+
+**Planned:** [Sparkle](../planning/0009_sparkle-auto-update.md) adds in-app "Update available" notifications for the DMG channel — the standard mechanism for non-App-Store Mac apps — driven by an appcast the release workflow publishes on each tag.
+
 ## Related
 
 - [permissions.md](permissions.md) — bundle-ID stability and the TCC story
 - [overview.md](overview.md) — why MAS is intentionally not a channel
-- [../planning/_index.md](../planning/_index.md) — release automation is on the roadmap, not built yet
+- [release-pipeline.md](release-pipeline.md) — the tag-triggered build/sign/notarize/publish workflow
+- [../conventions/versioning-and-releases.md](../conventions/versioning-and-releases.md) — versioning protocol and per-channel update behavior
