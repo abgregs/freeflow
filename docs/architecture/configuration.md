@@ -7,7 +7,7 @@ Two stores. Different responsibilities. Mixing them is the bug.
 `Constants.swift` holds values that are not user-facing and not expected to change at runtime:
 
 - Default values referenced by [`SettingsStore`](settings-store.md) keys (e.g., `defaultActivationKeyCode`, `defaultActivationMode`)
-- Internal tunables (e.g., `clipboardRestoreDelay`, `doubleTapWindowMs`)
+- Internal tunables (e.g., `keystrokeChunkUnits`, `doubleTapWindowMs`)
 - Identifiers, model lists, hard-coded UI strings
 
 **Rule:** if a user could plausibly want to change it from Settings, it does not live here. Constants is read at startup; nothing observes it. See [../conventions/anti-patterns.md](../conventions/anti-patterns.md).
