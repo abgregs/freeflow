@@ -55,7 +55,7 @@ key press → InputMonitoringCapability → HotkeyManager → FreeFlowSession.on
 key release → FreeFlowSession.onDeactivate
                 ↓
        state → .processing, TranscriptionService runs,
-       AccessibilityCapability posts ⌘V, state → .idle
+       AccessibilityCapability injects keystrokes, state → .idle
 ```
 
 A single `FreeFlowState` enum (`.idle` / `.recording` / `.processing`) gates every transition. `FreeFlowSession` is the only writer. Re-entrant or out-of-order events are no-ops.

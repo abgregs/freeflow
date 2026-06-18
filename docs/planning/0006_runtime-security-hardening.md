@@ -35,16 +35,7 @@ this) and verify on-device, not just in tests:
 
 ## Accepted trade-offs (by design — do not "fix" casually)
 
-- **Dictations transit the system pasteboard** (a ~250 ms window plus the paste
-  itself). Any process polling the pasteboard during that window can still read
-  it. Both writes now carry the nspasteboard.org transient/concealed markers
-  ([0007_transient-pasteboard-markers.md](0007_transient-pasteboard-markers.md),
-  landed 2026-06-12), so well-behaved clipboard managers skip recording
-  dictations; a manager that ignores the voluntary convention may still persist
-  them. **Why accepted:** paste-via-⌘V is the only universal insertion
-  mechanism; AX writes were rejected (see "No AX-API path" in
-  [../architecture/free-flow-pipeline.md](../architecture/free-flow-pipeline.md)).
-  The README carries the user-facing caveat, reworded for the markers.
+- **Dictations transit the system pasteboard — _eliminated_ as of [0011](0011_keystroke-injection.md).** This was an accepted trade-off: insertion used clipboard + ⌘V, exposing the transcription on the pasteboard for a ~250 ms window (pollers could read it), mitigated by transient/concealed markers (0007). 0011 switched insertion to synthesized **Unicode keystrokes**, which **never touch the clipboard** — so dictations don't transit the pasteboard at all, the exposure window is gone, and the 0007 markers are retired. No residual exposure here.
 - **The model cache is trusted without verification.** WhisperKit's cache under
   `~/Library/Application Support/FreeFlow/` (relocated from the `~/Documents`
   default — see [0010_relocate-model-cache.md](0010_relocate-model-cache.md)) is

@@ -15,7 +15,7 @@ Categories in use:
 - `hotkey` — `HotkeyManager` events, restart, tap status
 - `audio` — `MicrophoneCapability` engine start/stop + input format; `AudioCaptureManager` capture lifecycle, sample count, and conversion failures
 - `transcribe` — `TranscriptionService`: WhisperKit model-load lifecycle (start / loaded / failed), transcribe start (sample count), end (transcribed char count). **Never** log the transcribed text itself — that's user content (anti-pattern #4)
-- `insert` — `TextInsertionManager` clipboard write/verify/restore
+- `insert` — `TextInsertionManager` keystroke injection (typing the transcription at the cursor)
 
 Pick the category that matches where the code lives. Adding new categories is fine; reusing categories across files is fine when they share a concern.
 
@@ -33,7 +33,7 @@ Pick the category that matches where the code lives. Adding new categories is fi
 
 ### 1. User content is never logged — at any privacy level
 
-Transcribed text, custom dictionary terms, and clipboard contents are kept *out of the format string entirely*. Log a `.count` or length, never the value. This is structural: there is no `privacy:` annotation to get wrong because the content is never interpolated.
+Transcribed text and custom dictionary terms are kept *out of the format string entirely*. Log a `.count` or length, never the value. This is structural: there is no `privacy:` annotation to get wrong because the content is never interpolated.
 
 ```swift
 logger.info("Transcribed \(text.count, privacy: .public) chars")   // length OK

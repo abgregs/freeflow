@@ -35,7 +35,7 @@ Some entries below are marked **structurally impossible** — the architecture m
 
 ## 4. Logging user content, or trusting an opaque error string
 
-**Don't:** interpolate user content (transcribed text, dictionary terms, clipboard contents) into a log line at *any* privacy level. And don't log a third-party/OS `error.localizedDescription` `privacy: .public` raw — you don't control what it contains across OS and library versions.
+**Don't:** interpolate user content (transcribed text, dictionary terms) into a log line at *any* privacy level. And don't log a third-party/OS `error.localizedDescription` `privacy: .public` raw — you don't control what it contains across OS and library versions.
 
 **Do:** keep user content out of the format string entirely — log a `.count` or length, never the value. Log error strings `privacy: .public` (so the failure *reason* survives in field bug reports) but pass them through `LogRedaction.redactUserPaths(_:)` first, which strips `/Users/<name>` paths that would otherwise leak the macOS account name. See [logging.md](logging.md).
 

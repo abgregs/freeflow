@@ -2,6 +2,8 @@
 
 **Landed 2026-06-10** — see [current-focus.md](current-focus.md) for the as-built summary; this spec is retained as the record. Guards the synthesized paste against firing into a target that can't accept it. The `0001_` prefix orders it in the roadmap; see [_index.md](_index.md).
 
+> **Note (2026-06-18):** [0011](0011_keystroke-injection.md) replaced clipboard + ⌘V insertion with Unicode keystroke injection. The guard described here **survives** (now the "insertion guard" — it still skips non-editable targets); only the gated insertion mechanism changed, so references below to "the clipboard + ⌘V paste" now mean keystroke injection.
+
 ## Problem
 
 Today's paste path posts ⌘V system-wide via `.cghidEventTap` to whatever holds keyboard focus. It never targets or verifies a destination — that's the deliberate "No AX-API path" decision in [../architecture/free-flow-pipeline.md](../architecture/free-flow-pipeline.md). The cost is that **a paste into a non-editable focused target is indistinguishable from a successful paste**: `AccessibilityCapability.postKeyEvent` doesn't throw, `FreeFlowSession.handleDeactivate` logs success, the clipboard is restored — and the transcription silently goes nowhere, or triggers an unintended app command.

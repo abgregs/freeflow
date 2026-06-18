@@ -1,5 +1,7 @@
 # Planning: Transient Pasteboard Markers (roadmap 0007)
 
+> **Superseded (2026-06-18) by [0011_keystroke-injection.md](0011_keystroke-injection.md).** Text insertion no longer touches the clipboard — it synthesizes Unicode keystrokes — so these pasteboard markers are unnecessary and the marker code has been removed. Retained as the record of the markers' rationale and the empirical findings below.
+
 > **Status (2026-06-12): landed.** Both writes in `TextInsertionManager`
 > carry all three marker types (identifier strings in
 > `Constants.pasteboardMarkerTypes`, mapped once in the manager), unit-tested
