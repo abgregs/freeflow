@@ -55,7 +55,7 @@ key press → InputMonitoringCapability → HotkeyManager → RiverSession.onAct
 key release → RiverSession.onDeactivate
                 ↓
        state → .processing, TranscriptionService runs,
-       AccessibilityCapability posts ⌘V, state → .idle
+       AccessibilityCapability injects keystrokes, state → .idle
 ```
 
 A single `RiverState` enum (`.idle` / `.recording` / `.processing`) gates every transition. `RiverSession` is the only writer. Re-entrant or out-of-order events are no-ops.
