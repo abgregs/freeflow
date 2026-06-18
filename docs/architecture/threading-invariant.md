@@ -4,6 +4,8 @@ The CGEventTap that detects the activation key runs its `CFRunLoop` on a **dedic
 
 The invariant is owned by [`InputMonitoringCapability`](capabilities.md). The capability is the only code that calls `CGEvent.tapCreate`, manages the tap lifecycle, or touches the background thread. `HotkeyManager` and `FreeFlowSession` consume the capability's typed event stream; they never see the CFRunLoop or the thread directly.
 
+The tap is created **`.listenOnly`** (least privilege): the callback only observes `.flagsChanged` and returns events unmodified, so it never modifies or consumes input — `.listenOnly` makes that structurally impossible and keeps a stalled callback from delaying system-wide event delivery. See [../planning/0006_runtime-security-hardening.md](../planning/0006_runtime-security-hardening.md).
+
 ## The rule
 
 - The tap source must be added to `CFRunLoopGetCurrent()` from inside a `Thread` closure — never to `CFRunLoopGetMain()` or `RunLoop.main`.
@@ -25,7 +27,7 @@ Running the tap's CFRunLoop on its own background thread isolates it from anythi
 
 ## Self-healing the tap
 
-macOS will disable a tap that blocks too long, sending the callback one final event with `type == .tapDisabledByTimeout` or `.tapDisabledByUserInput`. `InputMonitoringCapability` responds by calling `CGEvent.tapEnable(tap: tap, enable: true)` and returning. This is normal; do not treat it as an error in user-facing UI.
+macOS will disable a tap that blocks too long, sending the callback one final event with `type == .tapDisabledByTimeout` or `.tapDisabledByUserInput`. `InputMonitoringCapability` responds by calling `CGEvent.tapEnable(tap: tap, enable: true)` and returning. This is normal; do not treat it as an error in user-facing UI. A spontaneous timeout-disable is far less likely for the `.listenOnly` tap (a passive tap doesn't hold up event delivery), but the self-heal is retained as a safety net.
 
 The same callback type also fires when the capability calls `CGEvent.tapEnable(... enable: false)` during teardown. Distinguish "we disabled it on purpose during stop" from "the system disabled it spontaneously" only by context, not by the type field — they're identical.
 

@@ -7,6 +7,10 @@ exploitable vulnerability.
 
 ## Finding: the event tap is more privileged than it needs to be
 
+> **Status (2026-06-17): implemented** — the tap is now created with
+> `options: .listenOnly`. CI build + tests are green; on-device confirmation
+> (all three activation modes + the self-heal path) rides the pre-v0.1.0 rc.
+
 `InputMonitoringCapability` creates its tap with `options: .defaultTap`
 (`InputMonitoringCapability.swift:73`) — an **active** tap, which may modify or
 consume every keyboard event on the system. The callback never does either: it
@@ -14,7 +18,7 @@ returns the event unmodified. `.listenOnly` would make modification
 *structurally impossible* (the same design language as the rest of the app) and
 means a stalled callback cannot delay system-wide event delivery.
 
-**Task:** create the tap with `.listenOnly`.
+**Task:** create the tap with `.listenOnly`. *(Done.)*
 
 The change touches the event-tap module governed by the threading invariant
 ([../architecture/threading-invariant.md](../architecture/threading-invariant.md)),

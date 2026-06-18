@@ -14,7 +14,7 @@ This collapses three otherwise-separate concerns into one pattern: permission de
 | Capability | What it gates | OS API it wraps |
 |---|---|---|
 | `MicrophoneCapability` | Audio capture | `AVCaptureDevice.requestAccess(.audio)` + `AVAudioEngine.start()` |
-| `InputMonitoringCapability` | Global event taps | `CGEvent.tapCreate(...)` |
+| `InputMonitoringCapability` | Global event taps | `CGEvent.tapCreate(..., options: .listenOnly)` — observe-only, never modifies/consumes input ([0006](../planning/0006_runtime-security-hardening.md)) |
 | `AccessibilityCapability` | Posting synthetic events to other apps | `CGEvent.post(...)` (specifically the synthesized ⌘V), plus the read-only focused-element role read behind the paste guard (`AXUIElementCopyAttributeValue` — see [free-flow-pipeline.md](free-flow-pipeline.md)) |
 
 ## Common interface

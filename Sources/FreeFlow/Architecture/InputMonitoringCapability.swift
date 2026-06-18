@@ -70,7 +70,13 @@ final class InputMonitoringCapability: Capability {
                 guard let tap = CGEvent.tapCreate(
                     tap: .cgSessionEventTap,
                     place: .headInsertEventTap,
-                    options: .defaultTap,
+                    // Listen-only (least privilege): the callback only observes
+                    // `.flagsChanged` and returns events unmodified, so it never
+                    // needs to modify or consume input. `.listenOnly` makes that
+                    // structurally impossible — the return value is ignored, and
+                    // a stalled callback can't delay system-wide event delivery.
+                    // See planning/0006_runtime-security-hardening.md.
+                    options: .listenOnly,
                     eventsOfInterest: mask,
                     callback: handleTapCallback,
                     userInfo: userInfo
