@@ -58,12 +58,12 @@ part of the attack surface; its integrity guarantees are a feature.
 ## Acceptance criteria
 
 1. The M11 workflow file passes review against every item above before the
-   first public tag is pushed. **Status (2026-06-15):** the workflow
+   first public tag is pushed. **Status (2026-06-22): done.** The workflow
    ([../../.github/workflows/release.yml](../../.github/workflows/release.yml))
-   is drafted to satisfy every checklist item — SHA-pinned action,
-   least-privilege `permissions`, ephemeral keychain with always-run teardown,
-   `Package.resolved` provenance, SHA-256 artifact. It has not yet run (pending
-   enrollment + secrets); first-run review on a `v*` tag closes this. See the
+   satisfies every checklist item — SHA-pinned action, least-privilege
+   `permissions`, ephemeral keychain with always-run teardown, `Package.resolved`
+   provenance, published SHA-256 — and ran on the `v0.1.0` tag, so the first-run
+   review on a `v*` tag is complete. See the
    [release-pipeline runbook](../architecture/release-pipeline.md).
 2. A released `.dmg`'s checksum matches both the published SHA-256 and the
    cask's `sha256`.

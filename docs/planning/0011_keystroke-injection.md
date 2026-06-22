@@ -1,6 +1,6 @@
 # Planning: Keystroke Injection — Race-Free Text Insertion (roadmap 0011)
 
-> **Status (2026-06-18): implemented; on-device validation rides the pre-v0.1.0 rc.**
+> **Status (2026-06-22): shipped in v0.1.0.** Implemented 2026-06-18; on-device validation across native AppKit, browser, Electron, and terminal passed on the pre-v0.1.0 rc.
 
 Text insertion used the clipboard: snapshot the user's pasteboard → write the transcription → synthesize ⌘V → wait `clipboardRestoreDelay` → restore. The restore is timed against a paste we **cannot observe** — there is no OS signal for "the synthesized ⌘V was consumed," and a clipboard *read* doesn't bump `changeCount`. So on a slow target (e.g. the first dictation after launch while the model loads) the restore lands *before* the paste, and the user's **old clipboard** gets pasted instead of the transcription. The 250 ms delay only narrowed the window; it provably can't close it (the consume time is unbounded and unobservable).
 
