@@ -22,6 +22,7 @@ Planning lives in three layers:
 - [0009_sparkle-auto-update.md](0009_sparkle-auto-update.md) — add the Sparkle framework for in-app "Update available" notifications on the DMG channel; the release workflow publishes a signed appcast per tag. Closes the V1 update gap.
 - [0010_relocate-model-cache.md](0010_relocate-model-cache.md) — **landing before v0.1.0**: download the WhisperKit model under `~/Library/Application Support/FreeFlow` instead of WhisperKit's `~/Documents` default, so first launch doesn't trigger a Documents-folder TCC prompt or clutter the user's Documents.
 - [0011_keystroke-injection.md](0011_keystroke-injection.md) — **landing before v0.1.0**: replace clipboard-paste insertion with Unicode keystroke injection (`CGEvent.keyboardSetUnicodeString`), eliminating the clipboard-restore race by construction (and the clipboard-privacy exposure); supersedes 0007; foundation for future streaming.
+- [0012_onboarding-permissions-polish.md](0012_onboarding-permissions-polish.md) — post-V1 polish for two first-run permissions rough edges: a freshly-granted Accessibility status not reflecting until repeated Refresh (probe retry-with-settle), and no on-demand way to re-open onboarding (a "Permissions…" menu item). Not a V1 blocker.
 
 Detailed specs for individual items live in their own files — a milestone (like [walking-skeleton.md](walking-skeleton.md) for M1) or a backlog item (the `NNNN_` files). The `NNNN_` prefix sorts the backlog roughly by intended order, not a strict queue.
 
