@@ -11,7 +11,7 @@ The core `homebrew-cask` repo has notability requirements and a review queue. A
 personal tap has neither — you control it, updates are instant, and the only
 extra step for users is naming the tap.
 
-## Install (for users, once the tap exists)
+## Install (for users)
 
 ```bash
 brew install --cask abgregs/freeflow/freeflow

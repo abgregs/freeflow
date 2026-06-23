@@ -6,9 +6,9 @@ Free Flow is a free, open-source macOS menu bar dictation app: hold (or tap) a k
 ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-lightgrey?style=for-the-badge)
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-- works in any app that accepts paste — Slack, browser, terminal, IDE
+- works in any app you can type into — Slack, browser, terminal, IDE
 - three activation modes (Hold, Single Tap, Double Tap) on your choice of ten keys
-- clipboard-safe: full snapshot and restore around every paste
+- clipboard-safe: text is typed straight in, your clipboard is never touched
 - 100% on-device — no account, no telemetry, no subscription
 
 <!-- TODO(screenshots): capture from the running app and drop into assets/
@@ -28,8 +28,8 @@ Free Flow is a free, open-source macOS menu bar dictation app: hold (or tap) a k
 </table>
 -->
 
-> [!IMPORTANT]
-> Free Flow is V1 feature-complete but not yet packaged for release. Until the signed `.dmg` and Homebrew cask land ([current focus](docs/planning/current-focus.md)), install by [building from source](#build-from-source).
+> [!NOTE]
+> Free Flow **v0.1.0** is out — a signed, notarized release. Install via [Homebrew](#install), grab the [`.dmg`](https://github.com/abgregs/free-flow/releases/latest), or [build from source](#build-from-source).
 
 ## Why Free Flow?
 
@@ -45,7 +45,7 @@ flowchart LR
         A("press or tap<br/>your activation key") -.-> B("record")
         B -.-> C("release<br/>or tap again")
         C -.-> D("transcribe on-device<br/>with WhisperKit")
-        D -.-> E("paste at cursor,<br/>clipboard restored")
+        D -.-> E("type at cursor —<br/>clipboard untouched")
     end
 
     classDef step fill:#4f8cc922,stroke:#5b8db8,stroke-width:1.5px
@@ -55,7 +55,7 @@ flowchart LR
     linkStyle default stroke:#5b8db8,stroke-width:1.5px
 ```
 
-The menu bar icon tracks each state of the cycle. Text lands via a synthesized ⌘V, and your previous clipboard — rich text and images included — is restored immediately after. Both clipboard writes are marked transient and concealed (the [nspasteboard.org](http://nspasteboard.org) convention), which well-behaved clipboard managers respect; managers that ignore the convention may still record dictations.
+The menu bar icon tracks each state of the cycle. Text is typed straight in at your cursor as synthesized keystrokes — Free Flow never reads or writes the system clipboard, so a dictation can't leak into your clipboard history and whatever you had copied is left exactly as it was.
 
 > [!NOTE]
 > First launch downloads the default model (~240 MB) from Hugging Face into `~/Library/Application Support/FreeFlow`. Every launch and dictation after that is fully offline.
@@ -66,18 +66,18 @@ The menu bar icon tracks each state of the cycle. Text lands via a synthesized �
 |---|---|
 | Activation modes | Hold (push-to-talk), Single Tap, or Double Tap |
 | Configurable key | Ten modifier-key options; default is Right Option |
-| Clipboard safety | Full pasteboard snapshot and restore; a paste guard skips non-editable targets |
+| Clipboard untouched | Text is typed in via keystroke injection — your clipboard is never read or written; a guard skips non-editable targets |
 | Live settings | Key and mode changes apply instantly — no restart |
 | Guided onboarding | Step-by-step setup for Microphone, Input Monitoring, and Accessibility |
 | Languages | English only for now; multilingual may come later |
 
 ## Install
 
-Coming with the release milestone:
-
 ```bash
 brew install --cask abgregs/freeflow/freeflow
 ```
+
+Or download the signed, notarized [`.dmg`](https://github.com/abgregs/free-flow/releases/latest) and drag Free Flow to Applications.
 
 Requirements: macOS 14+ on Apple Silicon.
 

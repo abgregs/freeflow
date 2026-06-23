@@ -5,10 +5,10 @@ How a public release is built, signed, notarized, and published. The pipeline is
 implements the security requirements in
 [../planning/0005_release-pipeline-security.md](../planning/0005_release-pipeline-security.md).
 
-> **Status (2026-06-15): drafted, not yet exercised.** The workflow is written
-> but has never run — it is blocked on Apple Developer Program enrollment and
-> the secrets below. Its first real run on a `v*` tag is the verification step
-> (M11 exit criteria). Treat the flow as reviewed-but-unproven until then.
+> **Status (2026-06-22): in production.** The pipeline ran on the `v0.1.0` tag —
+> it produced a Developer-ID-signed, notarized, stapled `FreeFlow-0.1.0.dmg` +
+> its SHA-256, published to the GitHub Release and feeding the live Homebrew tap.
+> M11's exit criteria are met; the flow below is the proven release path, not a draft.
 
 ## What it does
 

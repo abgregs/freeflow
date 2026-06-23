@@ -59,7 +59,7 @@ The sandbox is intentionally off (see [permissions.md](permissions.md)), so the 
 ## Releases
 
 - Tag a release: `git tag vX.Y.Z && git push origin vX.Y.Z`. `v*` tags are protected — deletion and force-push are blocked (see [../conventions/git.md](../conventions/git.md)).
-- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) builds the tagged commit, signs with Developer ID (reusing `make` so the bundle-integrity check from [anti-pattern #3](../conventions/anti-patterns.md) runs on the release build too), notarizes the app and the DMG via `xcrun notarytool`, staples both, and publishes the `.dmg` + a SHA-256 checksum to the GitHub Release. Required secrets, one-time setup, and how to cut a release are in the [release-pipeline runbook](release-pipeline.md). *(Drafted; not yet run — pending Developer Program enrollment.)*
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) builds the tagged commit, signs with Developer ID (reusing `make` so the bundle-integrity check from [anti-pattern #3](../conventions/anti-patterns.md) runs on the release build too), notarizes the app and the DMG via `xcrun notarytool`, staples both, and publishes the `.dmg` + a SHA-256 checksum to the GitHub Release. Required secrets, one-time setup, and how to cut a release are in the [release-pipeline runbook](release-pipeline.md). First run: `v0.1.0` (2026-06-22).
 - The Homebrew cask ([`../../packaging/homebrew/freeflow.rb`](../../packaging/homebrew/freeflow.rb)) points at the release `.dmg` and pins its published `sha256`.
 
 Versioning rules and the tag-driven protocol are in [../conventions/versioning-and-releases.md](../conventions/versioning-and-releases.md).

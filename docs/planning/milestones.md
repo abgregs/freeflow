@@ -4,7 +4,7 @@ Ordered. Each milestone is a state the project can pause at without being broken
 
 **These eleven milestones are the project's initial build-out — a one-time scaffolding sprint to a usable, shippable V1, not an open-ended backlog.** M1–M3 establish the architectural skeleton (bundle pipeline, capability layer, dictation session) before any feature code; M4–M9 fill the session interior (the full hold/tap → capture → transcribe → paste cycle plus settings); M10–M11 ship it (local install, then public release). **M11 is the finish line: once it lands the app is at V1, and everything after builds on this foundation** — tracked as the numbered backlog in [_index.md](_index.md) (`0001_`, `0002_`, …), not as new M-numbers.
 
-**Status (as of 2026-06-15):** M1–M10 are complete; **M11 (public release) is in progress** — the pipeline is drafted (signing, notarization, DMG, checksum, Homebrew cask) and is blocked only on Apple Developer Program enrollment for the Developer ID cert + notary credentials. The app is functionally usable; the remaining work is shipping the notarized artifact.
+**Status (as of 2026-06-22):** **M1–M11 are complete — Free Flow shipped `v0.1.0`.** The release pipeline ran end-to-end (Developer-ID-signed, notarized, stapled DMG + SHA-256 published to the GitHub Release) and the Homebrew tap (`abgregs/homebrew-freeflow`) is live and verified. The V1 sprint is done; further work is the post-V1 backlog in [_index.md](_index.md).
 
 ## M1: Walking skeleton
 
@@ -68,9 +68,9 @@ Exit criteria: `make install` produces a working `/Applications/FreeFlow.app` th
 
 ## M11: Public release pipeline
 
-GitHub Action: on tag, build with Developer ID signing, notarize via `notarytool`, staple, package as `.dmg`, attach to release. Homebrew cask in a separate `homebrew-freeflow` tap repo pointing at the release artifact. The workflow must satisfy the security checklist in [0005_release-pipeline-security.md](0005_release-pipeline-security.md). **In progress (2026-06-15):** the workflow, DMG script, and cask are drafted (see [../architecture/release-pipeline.md](../architecture/release-pipeline.md)); blocked on Developer Program enrollment for the signing cert + notary credentials.
+GitHub Action: on tag, build with Developer ID signing, notarize via `notarytool`, staple, package as `.dmg`, attach to release. Homebrew cask in a separate `homebrew-freeflow` tap repo pointing at the release artifact. The workflow must satisfy the security checklist in [0005_release-pipeline-security.md](0005_release-pipeline-security.md). **Complete (2026-06-22):** the pipeline ran on the `v0.1.0` tag — Developer-ID-signed, notarized, and stapled `FreeFlow-0.1.0.dmg` + SHA-256 published to the GitHub Release, and the cask in the live `abgregs/homebrew-freeflow` tap installs it (verified). See [../architecture/release-pipeline.md](../architecture/release-pipeline.md).
 
-Exit criteria: `git tag v0.1.0 && git push origin v0.1.0` results in a downloadable signed/notarized `.dmg` on the GitHub release page within 10 minutes, and the workflow passes review against [0005_release-pipeline-security.md](0005_release-pipeline-security.md).
+Exit criteria: `git tag v0.1.0 && git push origin v0.1.0` results in a downloadable signed/notarized `.dmg` on the GitHub release page within 10 minutes, and the workflow passes review against [0005_release-pipeline-security.md](0005_release-pipeline-security.md). **Met on 2026-06-22.**
 
 ## Beyond
 
