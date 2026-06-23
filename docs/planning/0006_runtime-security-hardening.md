@@ -7,9 +7,10 @@ exploitable vulnerability.
 
 ## Finding: the event tap is more privileged than it needs to be
 
-> **Status (2026-06-17): implemented** — the tap is now created with
-> `options: .listenOnly`. CI build + tests are green; on-device confirmation
-> (all three activation modes + the self-heal path) rides the pre-v0.1.0 rc.
+> **Status (2026-06-22): shipped in v0.1.0.** The tap is created with
+> `options: .listenOnly` (implemented 2026-06-17). CI build + tests are green;
+> on-device confirmation (all three activation modes + the self-heal path) passed
+> on the pre-v0.1.0 rc.
 
 `InputMonitoringCapability` creates its tap with `options: .defaultTap`
 (`InputMonitoringCapability.swift:73`) — an **active** tap, which may modify or
