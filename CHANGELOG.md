@@ -25,5 +25,5 @@ First public release — a macOS menu bar dictation app with fully on-device tra
 - Menu bar status that tracks the cycle (Ready → Recording → Processing) and surfaces errors.
 - Signed and notarized `.dmg`, plus a Homebrew cask (`brew install --cask abgregs/freeflow/freeflow`).
 
-[Unreleased]: https://github.com/abgregs/free-flow/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/abgregs/free-flow/releases/tag/v0.1.0
+[Unreleased]: https://github.com/abgregs/freeflow/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/abgregs/freeflow/releases/tag/v0.1.0
