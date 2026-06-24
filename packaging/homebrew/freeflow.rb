@@ -6,10 +6,10 @@ cask "freeflow" do
   version "0.1.0"
   sha256 "8addae1306d18974608792ce476b935f4fcbf7a4014484b4022ea9e80360eab0" # release .sha256
 
-  url "https://github.com/abgregs/free-flow/releases/download/v#{version}/FreeFlow-#{version}.dmg"
+  url "https://github.com/abgregs/freeflow/releases/download/v#{version}/FreeFlow-#{version}.dmg"
   name "Free Flow"
   desc "Menu bar dictation app with on-device transcription"
-  homepage "https://github.com/abgregs/free-flow"
+  homepage "https://github.com/abgregs/freeflow"
 
   depends_on macos: :sonoma # macOS 14+
   depends_on arch: :arm64   # Apple Silicon only

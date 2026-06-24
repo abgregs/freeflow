@@ -29,7 +29,7 @@ Free Flow is a free, open-source macOS menu bar dictation app: hold (or tap) a k
 -->
 
 > [!NOTE]
-> Free Flow **v0.1.0** is out — a signed, notarized release. Install via [Homebrew](#install), grab the [`.dmg`](https://github.com/abgregs/free-flow/releases/latest), or [build from source](#build-from-source).
+> Free Flow **v0.1.0** is out — a signed, notarized release. Install via [Homebrew](#install), grab the [`.dmg`](https://github.com/abgregs/freeflow/releases/latest), or [build from source](#build-from-source).
 
 ## Why Free Flow?
 
@@ -77,7 +77,7 @@ The menu bar icon tracks each state of the cycle. Text is typed straight in at y
 brew install --cask abgregs/freeflow/freeflow
 ```
 
-Or download the signed, notarized [`.dmg`](https://github.com/abgregs/free-flow/releases/latest) and drag Free Flow to Applications.
+Or download the signed, notarized [`.dmg`](https://github.com/abgregs/freeflow/releases/latest) and drag Free Flow to Applications.
 
 Requirements: macOS 14+ on Apple Silicon.
 
@@ -88,8 +88,8 @@ Requires only the Xcode Command Line Tools (`xcode-select --install`) — no ful
 1. One-time: create a self-signed certificate named "Free Flow Dev" (Keychain Access → Certificate Assistant → Create a Certificate → Self Signed Root → Code Signing). Details in [docs/architecture/distribution.md](docs/architecture/distribution.md).
 2. Build and install:
    ```bash
-   git clone https://github.com/abgregs/free-flow.git
-   cd free-flow
+   git clone https://github.com/abgregs/freeflow.git
+   cd freeflow
    swift build              # debug build
    swift test               # test suite
    make install             # release + sign + install to /Applications
