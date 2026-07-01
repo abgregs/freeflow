@@ -8,7 +8,7 @@ exploitable vulnerability.
 ## Finding: the event tap is more privileged than it needs to be
 
 > **Status (2026-06-22): shipped in v0.1.0.** The tap is created with
-> `options: .listenOnly` (implemented 2026-06-17). CI build + tests are green;
+> `options: .listenOnly` (implemented 2026-06-17). Local build + tests are green;
 > on-device confirmation (all three activation modes + the self-heal path) passed
 > on the pre-v0.1.0 rc.
 
