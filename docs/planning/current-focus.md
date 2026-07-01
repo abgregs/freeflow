@@ -44,7 +44,9 @@ What's actively in flight. Update this when you start or finish a milestone.
 
 ## Next up
 
-**The V1 sprint (M1–M11) is complete as of `v0.1.0`** (see the top of this log). Next work is the post-V1 backlog tracked in [_index.md](_index.md) — nearest candidates: [0013](0013_release-automation.md) (finish release automation — changelog release notes + auto Homebrew cask bump), [0012](0012_onboarding-permissions-polish.md) (first-run permissions polish), [0009](0009_sparkle-auto-update.md) (Sparkle auto-update, to close the DMG-channel update gap), [0004](0004_model-loading-indicator.md) (model-loading indicator), and the [0008](0008_custom-dictionary-redesign.md) dictionary redesign.
+**The V1 sprint (M1–M11) is complete as of `v0.1.0`** (see the top of this log). Next work is the post-V1 backlog tracked in [_index.md](_index.md).
+
+**Current priority: [0015](0015_automated-doc-sync.md) (automated doc sync).** Retire the project-scoped `brief`/`debrief` skills, make the contributor guidance harness-neutral, and stand up the daily maintainer doc-sync routine. It rewrites the working agreement below, so it lands **before** any other backlog item — otherwise new work keeps flowing through the process 0015 removes. After it: [0013](0013_release-automation.md) (finish release automation — changelog release notes + auto Homebrew cask bump), [0012](0012_onboarding-permissions-polish.md) (first-run permissions polish), [0009](0009_sparkle-auto-update.md) (Sparkle auto-update, to close the DMG-channel update gap), [0004](0004_model-loading-indicator.md) (model-loading indicator), and the [0008](0008_custom-dictionary-redesign.md) dictionary redesign.
 
 **Also queued: Recording indicator HUD** ([0002_recording-indicator-hud.md](0002_recording-indicator-hud.md)). A floating, fixed-position, non-activating "recording…" toast that observes the same `FreeFlowState` seam — mode-agnostic (identical for Hold / tap modes), deferred but captured. Depends on the menu-bar milestone's state seam (landed). Surface the applicable conventions (`brief` skill) before starting.
 
