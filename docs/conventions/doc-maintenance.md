@@ -50,7 +50,7 @@
 
 ## Failure behavior
 
-- Abort loudly and cleanly on anything unexpected — a missing or diverged cursor, a rejected push, a `gh` failure. An aborted run leaves no branch, no PR, and an unmoved cursor, and exits nonzero so it surfaces as a failed workflow run.
+- Abort loudly and cleanly on anything unexpected — a missing or diverged cursor, a rejected push, a `gh` failure. An aborted run leaves no branch, no PR, and an unmoved cursor, and surfaces as a failed workflow run (the workflow converts the routine's abort marker into a nonzero exit).
 - Never widen scope to "fix" the repo: no code edits, no tag pushes, no merges, no cleanup of unrelated branches.
 
 ## Related
