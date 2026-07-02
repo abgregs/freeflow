@@ -6,6 +6,7 @@
 
 - A GitHub Actions workflow ([.github/workflows/doc-sync.yml](../../.github/workflows/doc-sync.yml)) runs the routine via `anthropics/claude-code-action` on a cron schedule — 13:00 UTC on the 1st and 15th of each month. GitHub auth is the job's repo-scoped `GITHUB_TOKEN`; Claude auth is the `ANTHROPIC_API_KEY` repository secret (credential rationale: [0015](../planning/0015_automated-doc-sync.md)).
 - Manual runs: trigger the workflow's `workflow_dispatch`, optionally passing an explicit historical base for testing the pipeline against known drift. A base-override run must **not** advance the cursor.
+- The workflow performs the run's exit-early checks deterministically before invoking the model: an empty range or an open doc-sync PR ends the run with zero tokens consumed; a missing or diverged cursor fails it.
 - GitHub auto-disables cron workflows after 60 days without repository activity; re-enable from the Actions tab if notified.
 
 ## Range semantics
