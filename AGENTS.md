@@ -8,7 +8,7 @@ Authoritative project context lives in [`docs/`](docs/_index.md). Read `docs/_in
 
 **Before any non-trivial code change:** surface the applicable conventions, architectural constraints, and active requirements from `docs/`.
 
-**After any non-trivial code change:** doc updates alongside your change are welcome, not required — doc/code drift is caught by the maintainer's automated daily doc sync ([docs/conventions/doc-maintenance.md](docs/conventions/doc-maintenance.md)).
+**After any non-trivial code change:** doc updates alongside your change are welcome, not required — doc/code drift is caught by the maintainer's automated doc sync ([docs/conventions/doc-maintenance.md](docs/conventions/doc-maintenance.md)).
 
 ## Build & run
 

@@ -1,6 +1,6 @@
 # Planning: Current Focus
 
-What's actively in flight; kept current by the maintainer and the daily doc sync.
+What's actively in flight; kept current by the maintainer and the doc-sync routine.
 
 ## Status
 
@@ -46,14 +46,14 @@ What's actively in flight; kept current by the maintainer and the daily doc sync
 
 **The V1 sprint (M1–M11) is complete as of `v0.1.0`** (see the top of this log). Next work is the post-V1 backlog tracked in [_index.md](_index.md).
 
-**Current priority: [0015](0015_automated-doc-sync.md) (automated doc sync).** Retire the project-scoped `brief`/`debrief` skills, make the contributor guidance harness-neutral, and stand up the daily maintainer doc-sync routine. It rewrites the working agreement below, so it lands **before** any other backlog item — otherwise new work keeps flowing through the process 0015 removes. After it: [0013](0013_release-automation.md) (finish release automation — changelog release notes + auto Homebrew cask bump), [0012](0012_onboarding-permissions-polish.md) (first-run permissions polish), [0009](0009_sparkle-auto-update.md) (Sparkle auto-update, to close the DMG-channel update gap), [0004](0004_model-loading-indicator.md) (model-loading indicator), and the [0008](0008_custom-dictionary-redesign.md) dictionary redesign.
+**Current priority: [0015](0015_automated-doc-sync.md) (automated doc sync).** Retire the project-scoped `brief`/`debrief` skills, make the contributor guidance harness-neutral, and stand up the scheduled doc-sync workflow. It rewrites the working agreement below, so it lands **before** any other backlog item — otherwise new work keeps flowing through the process 0015 removes. After it: [0013](0013_release-automation.md) (finish release automation — changelog release notes + auto Homebrew cask bump), [0012](0012_onboarding-permissions-polish.md) (first-run permissions polish), [0009](0009_sparkle-auto-update.md) (Sparkle auto-update, to close the DMG-channel update gap), [0004](0004_model-loading-indicator.md) (model-loading indicator), and the [0008](0008_custom-dictionary-redesign.md) dictionary redesign.
 
 **Also queued: Recording indicator HUD** ([0002_recording-indicator-hud.md](0002_recording-indicator-hud.md)). A floating, fixed-position, non-activating "recording…" toast that observes the same `FreeFlowState` seam — mode-agnostic (identical for Hold / tap modes), deferred but captured. Depends on the menu-bar milestone's state seam (landed). Surface the applicable conventions from `docs/` before starting.
 
 ## Working agreement
 
 - Before any non-trivial code change: surface applicable conventions from `docs/`.
-- After any non-trivial code change: doc updates are welcome, not required — drift is caught by the maintainer's automated daily doc sync ([doc-maintenance.md](../conventions/doc-maintenance.md)).
+- After any non-trivial code change: doc updates are welcome, not required — drift is caught by the maintainer's automated doc sync ([doc-maintenance.md](../conventions/doc-maintenance.md)).
 - Commit using conventional commits (see [../conventions/git.md](../conventions/git.md)).
 - Don't push to `main` directly. PRs only.
 
@@ -61,4 +61,4 @@ What's actively in flight; kept current by the maintainer and the daily doc sync
 
 - The architecture docs encode hard-won lessons from a predecessor implementation. Treat the **Why:** annotations seriously — they exist because someone got bitten.
 - The most common failure mode in this app's lineage is infrastructure that *looks* like it works but silently doesn't (a tap that fires but a paste that's blocked; a bundle that signs but has no identifier). Verify with `codesign -dv`, log inspection, and end-to-end tests in a real text field — not just "swift build succeeded."
-- If you find a gap in the docs while working, flag it — a note in your PR is enough — rather than just plowing through. The docs are designed to evolve with the code; the daily doc sync picks up what a change makes stale.
+- If you find a gap in the docs while working, flag it — a note in your PR is enough — rather than just plowing through. The docs are designed to evolve with the code; the doc sync picks up what a change makes stale.
