@@ -1,6 +1,6 @@
 # Planning: Current Focus
 
-What's actively in flight. Update this when you start or finish a milestone.
+What's actively in flight; kept current by the maintainer and the daily doc sync.
 
 ## Status
 

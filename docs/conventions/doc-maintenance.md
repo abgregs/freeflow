@@ -12,7 +12,7 @@
 - **State is the git branch `doc-sync/cursor`** — its tip is the last commit a completed run covered. PR-body `Covers:` lines are informational only.
 - Each run reviews the half-open range `doc-sync/cursor..origin/main`, where the head is `origin/main`'s SHA snapshotted at run start; commits landing mid-run wait for the next run.
 - On successful completion — including a clean, nothing-to-report run — fast-forward the cursor to that head. `main` is append-only (force-push blocked), so the fast-forward never needs force. A failed or aborted run leaves the cursor untouched.
-- Bootstrap: the maintainer creates `doc-sync/cursor` once, at the merge commit of 0015's implementation PR. The routine never creates the cursor itself.
+- Bootstrap: the maintainer creates `doc-sync/cursor` (at the merge commit of 0015's implementation PR) and the `doc-sync` PR label once. The routine never creates either itself.
 - All dates (branch names, run records) are UTC.
 
 ## A run, start to finish
@@ -23,7 +23,7 @@
    - a doc-sync PR is still open — identified by the `doc-sync` label and the routine's author identity, never by branch name alone → the pending commits are covered next run.
 2. **Review.** Read the range's diff and commit messages (and the PR bodies its merge commits reference, via `gh`). Navigate from `docs/_index.md` through the category `_index.md` files to the docs covering the changed areas. For each relevant doc: still accurate? still complete? Classify every drift finding per the confidence rubric into a proposed edit or a flag.
 3. **Adversarial pass.** Independently re-verify every proposed edit against the rubric before applying it, with the burden of proof on the edit. Deliberate intent must be evidenced — a `**Why:**` line in a commit body, an explicit PR-body statement, or a planning doc; "it merged" proves nothing, since every commit on `main` arrives via a self-merged PR. Check closed doc-sync PRs: an edit substantially identical to one the maintainer closed is demoted to a flag citing that PR. Edits that fail the pass or are uncertain demote to flags.
-4. **Land.** Apply surviving edits on a fresh branch (naming below) as conventional `docs:` commits per [git.md](git.md), updating the relevant `_index.md` files and keeping every touched doc under ~150 lines. A rejected push (branch already exists) aborts the run — never force-push. Edits or flags present → open one PR; neither → no PR, just advance the cursor.
+4. **Land.** Apply surviving edits on a fresh branch (naming below) as conventional `docs:` commits per [git.md](git.md), updating the relevant `_index.md` files and keeping every touched doc under ~150 lines. A rejected push (branch already exists) aborts the run — never force-push. Edits or flags present → open one PR; neither → no PR. Either way the run is complete — fast-forward the cursor per Range semantics.
 
 ## The confidence rubric
 
@@ -43,7 +43,7 @@
 
 - Branch: `docs/doc-sync-<UTC date>-<short unique suffix>` (the suffix keeps a same-day retry from colliding). Label: `doc-sync`. Title mirrors the lead commit. Body: the [git.md](git.md) PR skeleton, plus:
   - `Covers: <base>..<head>` — the reviewed range, for context;
-  - **Flagged for maintainer** — a `- [ ]` checklist: each flag with its evidence (the commits, the docs, the contradiction). Unchecked flags from the most recent prior doc-sync PR — merged or closed — carry forward until checked off or moot.
+  - **Flagged for maintainer** — a `- [ ]` checklist: each flag with its evidence (the commits, the docs, the contradiction). Unchecked flags from the most recent prior doc-sync PR — merged or closed — carry forward until checked off or moot. Carried-forward flags attach to the next PR that opens; they do not themselves trigger one.
 - A flags-only run has no doc edits, so the branch carries one allow-empty `docs:` run-record commit. **Why:** GitHub refuses a PR with no commits; this is the documented exception to git.md's no-content-free-commits norm.
 - Merging accepts the edits. Closing rejects them — a later run that re-derives a rejected edit flags it instead of re-proposing. For partial acceptance, edit the branch before merging rather than closing.
 

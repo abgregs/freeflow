@@ -28,4 +28,4 @@ ADRs — load-bearing architectural decisions and the rationale for *not* taking
 - Rules carry a `**Why:**` annotation when the rationale isn't obvious or when the rule replaces a previous convention.
 - Docs cross-link freely: a convention links to the architecture it depends on; a requirement links to the conventions that govern its implementation.
 
-If something is missing or stale, it's a doc bug — fix it (or open a planning TODO).
+If something is missing or stale, it's a doc bug — a fix alongside your change is welcome, or just flag it; the daily doc sync will catch it.

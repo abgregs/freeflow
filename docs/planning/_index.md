@@ -1,6 +1,6 @@
 # planning/
 
-Active and future work. Read this first when planning a new task; update it as work progresses.
+Active and future work. Read this first when planning a new task; updated as work moves.
 
 Planning lives in three layers:
 
