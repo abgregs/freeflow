@@ -4,6 +4,7 @@
 
 - **`main`** is always green and always installable. Protected — no direct pushes.
 - **Feature branches** off `main`: `feat/<short-description>`, `fix/<short-description>`, `docs/<short-description>`.
+- The `docs/doc-sync-*` prefix is reserved for the automated doc-sync routine's branches ([doc-maintenance.md](doc-maintenance.md)).
 - **Stacked branches** allowed when work naturally chains: `feat/foo-step-2` branches off `feat/foo-step-1`. Both target `main`; rebase the dependent after the parent merges.
 
 ## Commits
