@@ -1,0 +1,61 @@
+# Scheduled doc-sync routine (roadmap 0015).
+# The spec lives in docs/conventions/doc-maintenance.md — this workflow is a
+# thin trigger around it. Requires the ANTHROPIC_API_KEY repository secret.
+name: Doc Sync
+
+on:
+  schedule:
+    - cron: "0 13 1,15 * *"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Optional base ref/SHA overriding doc-sync/cursor (test run; cursor is not advanced)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: doc-sync
+  cancel-in-progress: false
+
+jobs:
+  doc-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository (full history for the cursor range)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Run doc-sync
+        uses: anthropics/claude-code-action@6c0083bb7289c31716797a039b6367b3079cc46e # v1.0.162
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are Free Flow's doc-sync routine. Execute exactly ONE doc-sync run
+            as specified by docs/conventions/doc-maintenance.md in this repository.
+            Read that file in full before doing anything else — it is the single
+            source of truth for range determination (the doc-sync/cursor branch),
+            the review workflow, the confidence rubric, the adversarial pass,
+            branch naming and PR format (label: doc-sync), flag carry-forward, and
+            failure behavior.
+
+            Manual base override (empty on scheduled runs): "${{ inputs.base }}".
+            If non-empty, review the range from that base to origin/main instead of
+            the cursor range, and do NOT move the doc-sync/cursor branch.
+
+            Hard rules, restated from the spec: never edit code; never force-push;
+            never create tags; never merge or approve any PR. If a precondition
+            fails (missing or diverged cursor, rejected push, gh error), abort by
+            exiting with a clear error message so this workflow run fails.
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 100
+            --allowedTools "Bash,Read,Glob,Grep,Edit,Write"
+        env:
+          GH_TOKEN: ${{ github.token }}
