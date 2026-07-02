@@ -51,11 +51,20 @@ jobs:
 
             Hard rules, restated from the spec: never edit code; never force-push;
             never create tags; never merge or approve any PR. If a precondition
-            fails (missing or diverged cursor, rejected push, gh error), abort by
-            exiting with a clear error message so this workflow run fails.
+            fails (missing or diverged cursor, rejected push, gh error), abort:
+            write a one-line reason to /tmp/doc-sync-abort and stop — a follow-up
+            step turns that marker into a failed workflow run.
           claude_args: |
             --model claude-sonnet-4-6
             --max-turns 100
             --allowedTools "Bash,Read,Glob,Grep,Edit,Write"
         env:
           GH_TOKEN: ${{ github.token }}
+
+      - name: Fail the run if the routine aborted
+        if: always()
+        run: |
+          if [ -f /tmp/doc-sync-abort ]; then
+            echo "::error::doc-sync aborted: $(cat /tmp/doc-sync-abort)"
+            exit 1
+          fi
