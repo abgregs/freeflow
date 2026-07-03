@@ -1,0 +1,105 @@
+# Scheduled doc-sync routine (roadmap 0015).
+# The spec lives in docs/conventions/doc-maintenance.md — this workflow is a
+# thin trigger around it. Requires the ANTHROPIC_API_KEY repository secret.
+name: Doc Sync
+
+on:
+  schedule:
+    - cron: "0 13 1,15 * *"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Optional base ref/SHA overriding doc-sync/cursor (test run; cursor is not advanced)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: doc-sync
+  cancel-in-progress: false
+
+jobs:
+  doc-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository (full history for the cursor range)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      # Playbook step 1 (exit-early checks) is deterministic — run it in plain
+      # bash so an empty range or an open doc-sync PR consumes zero tokens.
+      - name: Decide whether a run is needed
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_OVERRIDE: ${{ inputs.base }}
+        run: |
+          if [ -n "$BASE_OVERRIDE" ]; then
+            echo "manual base override set — running"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git rev-parse --verify --quiet origin/doc-sync/cursor >/dev/null; then
+            echo "::error::doc-sync/cursor branch is missing — bootstrap it per docs/conventions/doc-maintenance.md"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor origin/doc-sync/cursor origin/main; then
+            echo "::error::doc-sync/cursor is not an ancestor of origin/main — refusing to guess a range"
+            exit 1
+          fi
+          count=$(git rev-list --count origin/doc-sync/cursor..origin/main)
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --label doc-sync --state open --json number --jq 'length')
+          if [ "$count" -eq 0 ]; then
+            echo "range is empty — nothing to review; no tokens consumed"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif [ "$open" -gt 0 ]; then
+            echo "an open doc-sync PR exists — pending commits are covered next run"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$count new commit(s) since the cursor — running"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run doc-sync
+        if: steps.gate.outputs.run == 'true'
+        uses: anthropics/claude-code-action@6c0083bb7289c31716797a039b6367b3079cc46e # v1.0.162
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are Free Flow's doc-sync routine. Execute exactly ONE doc-sync run
+            as specified by docs/conventions/doc-maintenance.md in this repository.
+            Read that file in full before doing anything else — it is the single
+            source of truth for range determination (the doc-sync/cursor branch),
+            the review workflow, the confidence rubric, the adversarial pass,
+            branch naming and PR format (label: doc-sync), flag carry-forward, and
+            failure behavior.
+
+            Manual base override (empty on scheduled runs): "${{ inputs.base }}".
+            If non-empty, review the range from that base to origin/main instead of
+            the cursor range, and do NOT move the doc-sync/cursor branch.
+
+            Hard rules, restated from the spec: never edit code; never force-push;
+            never create tags; never merge or approve any PR. If a precondition
+            fails (missing or diverged cursor, rejected push, gh error), abort:
+            write a one-line reason to /tmp/doc-sync-abort and stop — a follow-up
+            step turns that marker into a failed workflow run.
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 100
+            --allowedTools "Bash,Read,Glob,Grep,Edit,Write"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Fail the run if the routine aborted
+        if: always()
+        run: |
+          if [ -f /tmp/doc-sync-abort ]; then
+            echo "::error::doc-sync aborted: $(cat /tmp/doc-sync-abort)"
+            exit 1
+          fi

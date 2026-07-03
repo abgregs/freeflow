@@ -7,5 +7,6 @@ How code is written in Free Flow. Read what's relevant before changing code in t
 - [persistence.md](persistence.md) — `UserDefaults` keys, defaults, observation
 - [tests.md](tests.md) — `swift-testing` framework, test patterns, what's exercised and what isn't
 - [git.md](git.md) — branches, conventional commits, stacked PRs, what touches `main`
+- [doc-maintenance.md](doc-maintenance.md) — the automated doc-sync routine's spec: how `docs/` stays synced with the code, the confidence rubric, and the PR lifecycle
 - [versioning-and-releases.md](versioning-and-releases.md) — tag-driven release protocol, SemVer rules, the two macOS version fields, per-channel update behavior
 - [anti-patterns.md](anti-patterns.md) — explicit "do not do this," with the why

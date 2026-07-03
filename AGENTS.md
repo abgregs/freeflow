@@ -6,9 +6,9 @@ Project: **Free Flow** — a macOS menu bar dictation app. macOS 14+, Apple Sili
 
 Authoritative project context lives in [`docs/`](docs/_index.md). Read `docs/_index.md` first to get the map. Active work is tracked in [`docs/planning/current-focus.md`](docs/planning/current-focus.md).
 
-**Before any non-trivial code change:** surface the applicable conventions, architectural constraints, and active requirements from `docs/`. The repo ships a [`brief`](.claude/skills/brief/SKILL.md) skill that automates this for Claude Code users.
+**Before any non-trivial code change:** surface the applicable conventions, architectural constraints, and active requirements from `docs/`.
 
-**After any non-trivial code change:** check whether the change introduced a new pattern, replaced a convention, or made any doc stale — and update the docs. The repo's [`debrief`](.claude/skills/debrief/SKILL.md) skill automates this.
+**After any non-trivial code change:** doc updates alongside your change are welcome, not required — doc/code drift is caught by the maintainer's automated doc sync ([docs/conventions/doc-maintenance.md](docs/conventions/doc-maintenance.md)).
 
 ## Build & run
 
