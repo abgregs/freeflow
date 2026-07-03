@@ -23,8 +23,8 @@ means a stalled callback cannot delay system-wide event delivery.
 
 The change touches the event-tap module governed by the threading invariant
 ([../architecture/threading-invariant.md](../architecture/threading-invariant.md)),
-so review the applicable conventions first (the repo's `brief` skill automates
-this) and verify on-device, not just in tests:
+so review the applicable conventions first and verify on-device, not just in
+tests:
 
 1. **TCC interplay.** Active and listen-only keyboard taps interact differently
    with Accessibility / Input Monitoring. Confirm `tapCreate` still succeeds
