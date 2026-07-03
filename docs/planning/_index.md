@@ -1,6 +1,6 @@
 # planning/
 
-Active and future work. Read this first when planning a new task; update it as work progresses.
+Active and future work. Read this first when planning a new task; updated as work moves.
 
 Planning lives in three layers:
 
@@ -25,7 +25,7 @@ Planning lives in three layers:
 - [0012_onboarding-permissions-polish.md](0012_onboarding-permissions-polish.md) — post-V1 polish for two first-run permissions rough edges: a freshly-granted Accessibility status not reflecting until repeated Refresh (probe retry-with-settle), and no on-demand way to re-open onboarding (a "Permissions…" menu item). Not a V1 blocker.
 - [0013_release-automation.md](0013_release-automation.md) — automate the last manual release steps: publish the `CHANGELOG.md` section as the GitHub Release notes and auto-bump the Homebrew tap's cask on each tag (via a scoped cross-repo token). The tap repo stays — Homebrew mandates the `homebrew-` prefix and clones the whole tap per user — but becomes a generated artifact. Combines the changelog wiring and the deferred cask-bump automation.
 - [0014_test-coverage-and-ci.md](0014_test-coverage-and-ci.md) — harden the test surface from a testing-focused review (the suite is strong, not theater): run the 99-test suite in CI as a required check (today nothing runs `swift test` on PRs), then close four content gaps it leaves open — the transcription empty-prompt retry fallback, the `AppState` session→UI wiring, `AudioCaptureManager.convert` error/content paths, and a few minor branches. No new product behavior.
-- [0015_automated-doc-sync.md](0015_automated-doc-sync.md) — retire the project-scoped `brief`/`debrief` skills (their metadata is injected into every Claude Code session — a harness-specific workflow imposed on contributors, and doc upkeep pushed onto them) and make the contributor guidance harness-neutral; doc/code drift moves to a daily maintainer routine that reviews new commits, applies high-confidence doc updates behind an adversarial review pass, and opens a PR with ambiguous findings flagged for the maintainer.
+- [0015_automated-doc-sync.md](0015_automated-doc-sync.md) — retire the project-scoped `brief`/`debrief` skills (their metadata is injected into every Claude Code session — a harness-specific workflow imposed on contributors, and doc upkeep pushed onto them) and make the contributor guidance harness-neutral; doc/code drift moves to a scheduled maintainer routine that reviews new commits, applies high-confidence doc updates behind an adversarial review pass, and opens a PR with ambiguous findings flagged for the maintainer.
 
 Detailed specs for individual items live in their own files — a milestone (like [walking-skeleton.md](walking-skeleton.md) for M1) or a backlog item (the `NNNN_` files). The `NNNN_` prefix sorts the backlog roughly by intended order, not a strict queue.
 
