@@ -1,6 +1,6 @@
 # Planning: Current Focus
 
-What's actively in flight; kept current by the maintainer and the doc-sync routine.
+The project status log and the maintainer's queue; kept current by the maintainer and the doc-sync routine. It describes the state of the *project*, not the task of whoever is reading it — your task comes from your own issue, PR, or request.
 
 ## Status
 
