@@ -14,7 +14,7 @@
 - **State is the git branch `doc-sync/cursor`** — its tip is the last commit a completed run covered. PR-body `Covers:` lines are informational only.
 - Each run reviews the half-open range `doc-sync/cursor..origin/main`, where the head is `origin/main`'s SHA snapshotted at run start; commits landing mid-run wait for the next run.
 - On successful completion — including a clean, nothing-to-report run — fast-forward the cursor to that head. `main` is append-only (force-push blocked), so the fast-forward never needs force. A failed or aborted run leaves the cursor untouched.
-- Bootstrap: the maintainer creates `doc-sync/cursor` (at the merge commit of 0015's implementation PR) and the `doc-sync` PR label once. The routine never creates either itself.
+- Bootstrap (one-time, all done by the maintainer — the routine never creates these itself): the `doc-sync/cursor` branch (at the merge commit of 0015's implementation PR), the `doc-sync` PR label, and the repository setting **"Allow GitHub Actions to create and approve pull requests"** (Settings → Actions → General) — without it, `gh pr create` from the workflow is blocked and every run with findings aborts.
 - All dates (branch names, run records) are UTC.
 
 ## A run, start to finish
