@@ -53,7 +53,7 @@ No emoji. No co-author trailers from tools. No `chore: misc updates` style commi
   - [ ] Verification checklist.
   ```
 
-- Stacked PRs target their parent branch, not `main`, until the parent merges. Then GitHub auto-retargets the child.
+- Stacked PRs target their parent branch, not `main`. GitHub auto-retargets the child only when the parent **branch is deleted** — merging alone does not retarget, and merging the child while it still targets the parent branch lands it on the parent, not `main`. So after merging the parent PR, delete its branch (or manually retarget the child to `main`) before merging the child. **Why:** replaces the claim that merge alone retargets — PR #17 merged into its still-existing parent branch instead of `main` and had to be re-landed (#18).
 
 ## When to commit
 
