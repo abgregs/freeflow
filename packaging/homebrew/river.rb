@@ -14,6 +14,11 @@ cask "river" do
   depends_on macos: :sonoma # macOS 14+
   depends_on arch: :arm64   # Apple Silicon only
 
+  # The app self-updates via Sparkle (planning 0009); tell Homebrew so
+  # `brew upgrade` defers to Sparkle instead of fighting it. Users still get new
+  # versions on `brew upgrade --greedy` or a cask bump.
+  auto_updates true
+
   app "River.app"
 
   caveats <<~EOS
