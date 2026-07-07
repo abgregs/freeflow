@@ -24,8 +24,17 @@ On a `v*` tag push, on an Apple Silicon runner:
 5. Notarizes the app via `notarytool --wait`, staples it.
 6. Packages the DMG ([`scripts/make-dmg`](../../scripts/make-dmg)), signs,
    notarizes, and staples it.
-7. Publishes the DMG + a SHA-256 checksum to the GitHub Release.
-8. Tears down the keychain and key material — even on failure.
+7. EdDSA-signs the DMG with `sign_update` and writes a single-item Sparkle
+   appcast ([`scripts/make-appcast`](../../scripts/make-appcast)) — planning 0009.
+8. Publishes the DMG + a SHA-256 checksum + `appcast.xml` to the GitHub Release.
+9. Tears down the keychain and key material — even on failure.
+
+`SUFeedURL` points at `/releases/latest/download/appcast.xml`, which always
+resolves to the newest **non-pre-release** release's asset. Each release attaches
+its own single-item appcast listing itself; Sparkle offers the highest
+`CFBundleVersion` it sees, so one item is enough and the pipeline stays stateless
+(no need to carry every past DMG forward to rebuild a cumulative feed). Suffixed
+test tags publish as pre-releases and are therefore invisible to Sparkle users.
 
 ## Required GitHub secrets
 
@@ -37,9 +46,17 @@ On a `v*` tag push, on an Apple Silicon runner:
 | `NOTARY_API_KEY_BASE64` | Base64 of the App Store Connect API key (`.p8`) |
 | `NOTARY_API_KEY_ID` | The API key's Key ID |
 | `NOTARY_API_ISSUER_ID` | The API key's Issuer ID |
+| `SPARKLE_PRIVATE_KEY` | Base64 EdDSA private key that signs the Sparkle appcast (planning 0009) |
 
 App Store Connect API key is used over an Apple ID + app-specific password — it
 is revocable, has no 2FA interactivity, and scopes to notarization.
+
+The Sparkle EdDSA key is independent of Apple's Developer ID signing — it is
+Sparkle's own integrity check on the downloaded update. The workflow pipes it to
+`sign_update` over **stdin** (never a file or a command argument), and
+`sign_update` ships inside the Sparkle SwiftPM artifact, integrity-verified by
+SPM against the checksum pinned in `Package.resolved` — so the appcast step adds
+no unpinned action or extra download (0005 workflow hardening).
 
 ## One-time setup
 
@@ -49,6 +66,21 @@ is revocable, has no 2FA interactivity, and scopes to notarization.
    the `.p8` (one-time download) and note the Key ID + Issuer ID.
 3. `base64 -i cert.p12 | pbcopy` (and the `.p8`) into the secrets above.
 4. Confirm tag protection is active (it is — see [../conventions/git.md](../conventions/git.md)).
+5. **Sparkle keypair (one-time, planning 0009):** generate the EdDSA keypair with
+   the `generate_keys` tool that ships in the Sparkle SwiftPM artifact (after a
+   `swift build`, it lives under
+   `.build/artifacts/sparkle/Sparkle/bin/generate_keys`). Running it prints the
+   **public** key and stores the **private** key in your login Keychain. Then:
+   - Paste the printed public key into `SUPublicEDKey` in
+     [`Info.plist`](../../Sources/FreeFlow/Resources/Info.plist), replacing the
+     `REPLACE_WITH_SPARKLE_ED_PUBLIC_KEY` placeholder.
+   - Export the private key (`generate_keys -x private-key.txt`), base64-encode
+     it (`base64 -i private-key.txt | pbcopy`), and store it as the
+     `SPARKLE_PRIVATE_KEY` secret. **Never commit the private key.**
+
+   Until both are in place, builds still ship, but Sparkle updates fail signature
+   verification (safe-by-default) and the appcast step fails loudly on the
+   missing secret.
 
 ## Cutting a release
 
