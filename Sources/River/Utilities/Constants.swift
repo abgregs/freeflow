@@ -133,6 +133,15 @@ enum Constants {
     // enough to "get out of the way."
     static let errorToastDurationSeconds: Double = 4.0
 
+    // Accessibility recheck settle: after `AXIsProcessTrusted()` reports trusted, the
+    // silent-no-op probe is retried up to this many times before concluding not-granted.
+    // A freshly-granted permission often isn't reflected on the first re-check (macOS
+    // doesn't push TCC grants to an already-running process). A persistent failure — all
+    // retries exhausted — still downgrades to `.denied`, preserving the bundle-
+    // misidentification detector (anti-pattern #3). Internal tunables, not settings.
+    static let accessibilityProbeRetryCount: Int = 2
+    static let accessibilityProbeRetryDelayMs: Double = 150   // milliseconds between retries
+
     // nspasteboard.org marker types for the user-initiated "Copy Last Transcription"
     // write (planning 0019). Applied so well-behaved clipboard managers skip recording
     // dictated content — same rationale as 0007. The automated cycle never touches

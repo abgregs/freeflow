@@ -46,6 +46,15 @@ final class OnboardingCoordinator {
         present()
     }
 
+    /// Opens the permissions window unconditionally — the on-demand re-entry
+    /// path for the "Permissions…" menu item. Shows even when all capabilities
+    /// are granted so users can re-inspect their grants or reach the Refresh
+    /// button after closing onboarding early. Re-activates an already-open
+    /// window rather than spawning a second one.
+    func forcePresent() {
+        present()
+    }
+
     // The runtime degradation hook. The `.granted → !.granted` transition is the
     // one that matters: it's how the M7 silent-no-op detector reaches the user
     // even after the launch-time gate let them through. A `.denied → .granted`
