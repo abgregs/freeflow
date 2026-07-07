@@ -94,6 +94,15 @@ final class TranscriptionManager {
         customDictionaryTerms = terms
     }
 
+    // internal for the eval harness (`TranscriptionEvalTests`, planning 0022) —
+    // loads a clip to the 16 kHz float array WhisperKit decodes. Wraps
+    // `AudioProcessor` so WhisperKit stays a single import boundary and the test
+    // target need not depend on it. Not used in production (live capture supplies
+    // samples directly).
+    static func loadAudioSamples(fromPath path: String) throws -> [Float] {
+        try AudioProcessor.loadAudioAsFloatArray(fromPath: path)
+    }
+
     /// Returns the transcribed text or throws. Throws `.modelNotLoaded` if
     /// `loadModel` hasn't completed (the fail-fast surface — the session logs
     /// and still returns the cycle to `.idle`).
