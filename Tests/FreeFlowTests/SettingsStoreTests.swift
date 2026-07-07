@@ -43,6 +43,30 @@ struct SettingsStoreTests {
     }
 
     @MainActor
+    @Test("round-trips selectedModel with default")
+    func roundTripsSelectedModel() async throws {
+        let store = makeStore()
+        #expect(store.value(for: Settings.selectedModel) == Constants.defaultModel)
+        store.setValue("openai_whisper-base.en", for: Settings.selectedModel)
+        #expect(store.value(for: Settings.selectedModel) == "openai_whisper-base.en")
+    }
+
+    @MainActor
+    @Test("selectedModel publisher emits only when the value changes")
+    func selectedModelPublisherDedupes() async throws {
+        let store = makeStore()
+        var received: [String] = []
+        let token = store.publisher(for: Settings.selectedModel).sink { received.append($0) }
+        defer { token.cancel() }
+
+        store.setValue("openai_whisper-base.en", for: Settings.selectedModel)
+        store.setValue("openai_whisper-base.en", for: Settings.selectedModel)  // no-op
+        store.setValue("distil-whisper_distil-large-v3", for: Settings.selectedModel)
+
+        #expect(received == [Constants.defaultModel, "openai_whisper-base.en", "distil-whisper_distil-large-v3"])
+    }
+
+    @MainActor
     @Test("round-trips a RawRepresentable enum (ActivationMode) as its raw value")
     func roundTripsActivationMode() async throws {
         let store = makeStore()

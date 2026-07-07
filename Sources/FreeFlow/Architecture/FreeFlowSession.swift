@@ -39,6 +39,10 @@ final class FreeFlowSession {
     // during one Hold recording or `.processing` window, and both must apply on
     // the return to `.idle` — a single slot would drop the earlier one.
     private var pendingReconfigurations: [() -> Void] = []
+    // A single slot, not a list: a model switch replaces the whole model, so only
+    // the latest selection matters — collapsing A→B→C during one cycle to just C
+    // avoids reloading models the user already moved past.
+    private var pendingModelSwitch: (() -> Void)?
     // The mode driving the current recording — decides whether a mid-recording
     // key/mode change applies live (tap modes) or is deferred (Hold).
     private var activeMode: ActivationMode = Constants.defaultActivationMode
@@ -47,6 +51,11 @@ final class FreeFlowSession {
     // counters rather than inspecting the handler closures.
     private(set) var configurationApplyCount = 0
     private(set) var configurationDeferCount = 0
+    // Separate counters for the model-switch path (planning 0021): it shares the
+    // apply-or-defer contract but never the tap-mode live branch, and keeping it off
+    // the hotkey counters keeps each path's tests independent.
+    private(set) var modelReloadApplyCount = 0
+    private(set) var modelReloadDeferCount = 0
 
     var state: AnyPublisher<FreeFlowState, Never> { stateSubject.eraseToAnyPublisher() }
     var currentState: FreeFlowState { stateSubject.value }
@@ -174,6 +183,7 @@ final class FreeFlowSession {
         stateSubject.send(.idle)
         logger.info("State -> idle")
         applyPendingReconfigurations()
+        applyPendingModelSwitch()
     }
 
     // Pending reconfigurations parked during a non-idle cycle fire on the
@@ -208,6 +218,9 @@ final class FreeFlowSession {
                 }
             }
             .store(in: &cancellables)
+        settings.publisher(for: Settings.selectedModel)
+            .sink { [weak self] newModel in self?.reconfigureModel(newModel) }
+            .store(in: &cancellables)
     }
 
     // Mode-dependent reconfiguration. Idle applies immediately. During a tap-mode
@@ -230,5 +243,36 @@ final class FreeFlowSession {
             pendingReconfigurations.append(apply)
             configurationDeferCount += 1
         }
+    }
+
+    // Model-switch reconfiguration (planning 0021). Mirrors the hotkey apply-or-defer
+    // contract, minus the tap-mode live branch: reloading the model mid-recording
+    // would swap `whisperKit` out from under the pending `.processing` transcribe, so
+    // a switch is only ever applied at `.idle` — immediately when idle, or on the
+    // deferred return to `.idle` otherwise. The manager re-enters the 0004 load states
+    // during the reload, so the menu bar shows the switch rather than a false "Ready."
+    private func reconfigureModel(_ newModel: String) {
+        switch currentState {
+        case .idle:
+            applyModelSwitch(newModel)
+            modelReloadApplyCount += 1
+        case .recording, .processing:
+            pendingModelSwitch = { [weak self] in self?.applyModelSwitch(newModel) }
+            modelReloadDeferCount += 1
+        }
+    }
+
+    private func applyModelSwitch(_ newModel: String) {
+        let transcription = self.transcription
+        Task { @MainActor in await transcription.switchModel(to: newModel) }
+    }
+
+    // Fires the parked model switch on the return to `.idle`, closing the same
+    // deferral loop as `applyPendingReconfigurations` for the model path.
+    private func applyPendingModelSwitch() {
+        guard let pending = pendingModelSwitch else { return }
+        pendingModelSwitch = nil
+        pending()
+        modelReloadApplyCount += 1
     }
 }

@@ -49,6 +49,69 @@ struct TranscriptionManagerLoadStateTests {
     }
 }
 
+@Suite("TranscriptionManager model switch")
+struct TranscriptionManagerModelSwitchTests {
+    // planning 0021: the picker switches models off-cycle. `prepareModelSwitch` is the
+    // synchronous half — it re-points the manager and re-enters the 0004 load window
+    // so the menu bar can't keep showing "Ready" for a model that isn't loaded yet.
+
+    @MainActor
+    @Test("prepareModelSwitch re-points the model and re-enters the load window")
+    func switchRepointsAndReloads() {
+        let mgr = TranscriptionManager(modelName: "openai_whisper-small.en")
+        mgr.setModelLoadStateForTesting(.ready)   // pretend the first model is warm
+        let changed = mgr.prepareModelSwitch(to: "openai_whisper-base.en")
+        #expect(changed)
+        #expect(mgr.currentModelName == "openai_whisper-base.en")
+        // Re-entered the honest load window — never left showing "Ready" for a model
+        // that is not actually loaded (planning 0004/0021 AC3). On CI the new model is
+        // uncached (.downloading); with a cache it's .loading — either is honest.
+        #expect(mgr.currentModelLoadState != .ready)
+        #expect(mgr.currentModelLoadState != .failed)
+    }
+
+    @MainActor
+    @Test("prepareModelSwitch to the already-active model is a no-op")
+    func switchToSameModelIsNoOp() {
+        let mgr = TranscriptionManager(modelName: "openai_whisper-small.en")
+        mgr.setModelLoadStateForTesting(.ready)
+        let changed = mgr.prepareModelSwitch(to: "openai_whisper-small.en")
+        #expect(!changed)
+        #expect(mgr.currentModelName == "openai_whisper-small.en")
+        #expect(mgr.currentModelLoadState == .ready)   // untouched — no needless reload
+    }
+}
+
+@Suite("Curated model list")
+struct CuratedModelListTests {
+    // planning 0021: the picker is driven by `Constants.curatedModels`. This pins the
+    // load-bearing invariants — the default is selectable and every entry is complete —
+    // so a dropped default or a half-filled row is a failing test, not silent drift.
+
+    @MainActor
+    @Test("the curated list includes the default model")
+    func includesDefault() {
+        #expect(Constants.curatedModels.contains { $0.name == Constants.defaultModel })
+    }
+
+    @MainActor
+    @Test("every entry has a name, label, and hint")
+    func entriesAreComplete() {
+        for model in Constants.curatedModels {
+            #expect(!model.name.isEmpty)
+            #expect(!model.label.isEmpty)
+            #expect(!model.hint.isEmpty)
+        }
+    }
+
+    @MainActor
+    @Test("model names are unique (Picker tags must not collide)")
+    func namesAreUnique() {
+        let names = Constants.curatedModels.map(\.name)
+        #expect(Set(names).count == names.count)
+    }
+}
+
 @Suite("TranscriptionManager model gate")
 struct TranscriptionManagerGateTests {
     @MainActor
