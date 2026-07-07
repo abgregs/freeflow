@@ -32,9 +32,40 @@ enum Constants {
     // dictionary (prompt-token biasing) is unreliable on smaller models: `base.en`
     // degenerates to empty output when given a prompt (verified via the A/B eval
     // harness — see requirements/custom-dictionary.md). `small.en` (~240 MB) handles
-    // prompts robustly and is more accurate, at some cost in speed/memory. A model
-    // picker (deferred, M9+) can let speed-focused users drop back to `base.en`.
+    // prompts robustly and is more accurate, at some cost in speed/memory. The model
+    // picker (planning 0021) lets speed-focused users drop back to `base.en`; this is
+    // the default the `Settings.selectedModel` key sources.
     static let defaultModel: String = "openai_whisper-small.en"
+
+    // PROVISIONAL curated list for the model picker (planning 0021). The final list
+    // and default are decided by 0022's per-model scorecards, which don't exist yet —
+    // these four are placeholders: the two known-good English models plus two stronger
+    // candidates that have never been evaluated here. Names are the exact
+    // `argmaxinc/whisperkit-coreml` repo folders WhisperKit downloads (verified against
+    // WhisperKit 0.18's model tables). Sizes are approximate on-disk footprints. Each
+    // entry must earn its place via a 0022 scorecard before this list is finalized.
+    static let curatedModels: [ModelOption] = [
+        ModelOption(
+            name: "openai_whisper-base.en",
+            label: "Base (English)",
+            hint: "Fastest, smallest (~150 MB). Lower accuracy."
+        ),
+        ModelOption(
+            name: defaultModel,   // openai_whisper-small.en
+            label: "Small (English)",
+            hint: "Balanced speed and accuracy (~240 MB). Current default."
+        ),
+        ModelOption(
+            name: "distil-whisper_distil-large-v3",
+            label: "Distil Large v3",
+            hint: "High accuracy, distilled for speed (~600 MB)."
+        ),
+        ModelOption(
+            name: "openai_whisper-large-v3-v20240930_turbo",
+            label: "Large v3 Turbo",
+            hint: "Most accurate, turbo decoding (~630 MB). Slowest to load."
+        ),
+    ]
 
     // Seed for the user-editable custom dictionary. Empty by default; the user
     // curates terms in Settings (M8). A curated starter list could be added here

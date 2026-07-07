@@ -47,10 +47,16 @@ enum TranscriptionError: Error, LocalizedError {
 @MainActor
 final class TranscriptionManager {
     private let logger = Logger(subsystem: Constants.loggingSubsystem, category: "transcribe")
-    private let modelName: String
+    // Mutable so the model picker (planning 0021) can switch models off-cycle via
+    // `switchModel(to:)`; the active model always drives `loadModel` and the cache path.
+    private var modelName: String
 
     private var whisperKit: WhisperKit?
     private var loadTask: Task<WhisperKit, Error>?
+    // Bumped by every `prepareModelSwitch`; a `loadModel` run only commits its result
+    // when its captured generation is still current, so a switch that supersedes an
+    // in-flight load (e.g. the launch load) can't clobber the newer model's state.
+    private var loadGeneration = 0
 
     // Published model load state — the menu bar observes this to show an honest
     // "Downloading…" / "Loading…" / "Ready" status during the launch window.
@@ -125,6 +131,7 @@ final class TranscriptionManager {
             _ = try await loadTask.value
             return
         }
+        let generation = loadGeneration
         logger.info("Loading WhisperKit model \(self.modelName, privacy: .public)")
         let downloadBase = Self.modelDownloadBase()
         let modelName = self.modelName
@@ -144,15 +151,62 @@ final class TranscriptionManager {
         loadTask = task
         do {
             let wk = try await task.value
+            // A model switch bumped the generation while we loaded — the newer
+            // `switchModel` owns `whisperKit`/state now, so drop this stale result.
+            guard generation == loadGeneration else { return }
             whisperKit = wk
             loadStateSubject.send(.ready)
             logger.info("WhisperKit model loaded")
         } catch {
+            // Don't overwrite a newer switch's state with this superseded failure.
+            guard generation == loadGeneration else { throw error }
             loadTask = nil
             loadStateSubject.send(.failed)
             logger.error("WhisperKit load failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
             throw error
         }
+    }
+
+    // internal for testability — the model picker's current selection, so session
+    // tests can confirm a switch actually re-pointed the manager.
+    var currentModelName: String { modelName }
+
+    // internal for testability — the synchronous half of a model switch (planning
+    // 0021): swaps the model name and resets `whisperKit`/`loadTask` so the next
+    // `loadModel()` won't early-return, re-entering the 0004 load state
+    // (`.downloading` if the new model is uncached, else `.loading`) so the menu bar
+    // shows the switch honestly. Returns `false` — a no-op — when the requested model
+    // is already active. Split from the async reload so the reset and the state
+    // transition are unit-testable without loading a real WhisperKit model.
+    @discardableResult
+    func prepareModelSwitch(to newModelName: String) -> Bool {
+        guard newModelName != modelName else { return false }
+        loadGeneration += 1
+        modelName = newModelName
+        whisperKit = nil
+        loadTask?.cancel()
+        loadTask = nil
+        let isCached = Self.isModelCached(downloadBase: Self.modelDownloadBase(), modelName: newModelName)
+        loadStateSubject.send(isCached ? .loading : .downloading)
+        return true
+    }
+
+    // internal for testability — turns the async reload half of `switchModel` into a
+    // no-op so `FreeFlowSession` tests can exercise the apply-or-defer routing without
+    // loading a real WhisperKit model (mirrors `MicrophoneCapability.skipEngineForTesting`).
+    // The synchronous `prepareModelSwitch` still runs, so the re-point and the
+    // load-state transition stay observable.
+    var skipLoadForTesting = false
+
+    /// Switches to a different curated model and reloads it off-cycle. No-op when the
+    /// model is already active. Reuses `loadModel()`'s coalescing after
+    /// `prepareModelSwitch` clears the early-return guards. Called from
+    /// `FreeFlowSession` only at `.idle` (or on the deferred return to `.idle`), so a
+    /// switch can never reload the model out from under an in-flight cycle.
+    func switchModel(to newModelName: String) async {
+        guard prepareModelSwitch(to: newModelName) else { return }
+        if skipLoadForTesting { return }
+        try? await loadModel()
     }
 
     func setCustomDictionaryTerms(_ terms: [String]) {
