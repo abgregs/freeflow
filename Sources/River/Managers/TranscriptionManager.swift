@@ -198,6 +198,11 @@ final class TranscriptionManager {
     // load-state transition stay observable.
     var skipLoadForTesting = false
 
+    // internal for testability — when set, `transcribe` returns this string instead of
+    // calling WhisperKit. Lets session tests exercise post-transcription paths (last-
+    // transcript retention, insertion) without a live model.
+    var transcribeResultForTesting: String?
+
     /// Switches to a different curated model and reloads it off-cycle. No-op when the
     /// model is already active. Reuses `loadModel()`'s coalescing after
     /// `prepareModelSwitch` clears the early-return guards. Called from
@@ -226,6 +231,7 @@ final class TranscriptionManager {
     /// `loadModel` hasn't completed (the fail-fast surface — the session logs
     /// and still returns the cycle to `.idle`).
     func transcribe(audioSamples: [Float]) async throws -> String {
+        if let result = transcribeResultForTesting { return result }
         guard let whisperKit else { throw TranscriptionError.modelNotLoaded }
         logger.info("Transcribing \(audioSamples.count, privacy: .public) samples")
 
