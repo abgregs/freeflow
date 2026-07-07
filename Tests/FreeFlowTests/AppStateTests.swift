@@ -77,6 +77,38 @@ struct AppStateTests {
         #expect(env.appState.notice == nil)                // notice cleared when the recording ended
     }
 
+    @MainActor
+    @Test("model load state propagates through apply(modelLoadState:)")
+    func modelLoadStateApply() {
+        // planning 0004: the load state entry point drives the menu bar's
+        // download/load/ready label independently of the cycle state.
+        let appState = AppState()
+        #expect(appState.modelLoadState == .loading)  // default before bind
+        appState.apply(modelLoadState: .downloading)
+        #expect(appState.modelLoadState == .downloading)
+        appState.apply(modelLoadState: .ready)
+        #expect(appState.modelLoadState == .ready)
+    }
+
+    @MainActor
+    @Test("bind(transcription:) wires model load state from the real publisher")
+    func bindTranscriptionWiresModelLoadState() {
+        let transcription = TranscriptionManager()
+        let appState = AppState()
+        appState.bind(transcription: transcription)
+
+        // The bind subscribes to `modelLoadState` publisher via CurrentValueSubject,
+        // which immediately delivers the current value on subscribe.
+        let initialState = appState.modelLoadState
+        // Should be .downloading or .loading depending on whether the model is
+        // cached on this machine — either is valid, just not .ready or .failed.
+        #expect(initialState == .downloading || initialState == .loading)
+
+        // Driving via the test seam confirms the publisher → apply bridge is live.
+        transcription.setModelLoadStateForTesting(.ready)
+        #expect(appState.modelLoadState == .ready)
+    }
+
     // MARK: - Test environment
 
     @MainActor
@@ -97,6 +129,10 @@ struct AppStateTests {
         let inputMonitoring = InputMonitoringCapability()
         let hotkey = HotkeyManager(inputMonitoring: inputMonitoring, initialKeyCode: 62)
         let store = SettingsStore(defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
+        let transcription = TranscriptionManager()
+        // Unit tests never load the real model — mark ready so handleActivate
+        // exercises the recording path rather than the model-gate decline.
+        transcription.setModelLoadStateForTesting(.ready)
         let session = FreeFlowSession(
             accessibility: accessibility,
             microphone: microphone,
@@ -104,7 +140,7 @@ struct AppStateTests {
             hotkey: hotkey,
             audio: AudioCaptureManager(microphone: microphone),
             textInsertion: TextInsertionManager(accessibility: accessibility),
-            transcription: TranscriptionManager(),
+            transcription: transcription,
             settings: store
         )
         let appState = AppState()
