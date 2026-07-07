@@ -26,18 +26,22 @@ brew tap abgregs/freeflow && brew install --cask freeflow
 
 ## Per release
 
-After [`release.yml`](../../.github/workflows/release.yml) publishes a tagged
-DMG and its `.sha256`:
+Automated (planning 0013): after [`release.yml`](../../.github/workflows/release.yml)
+publishes a tagged DMG and its `.sha256`, the same workflow renders this
+template — substituting only `version` (from the tag) and `sha256` (read from
+the published `FreeFlow-x.y.z.dmg.sha256`) — and pushes the result to the tap's
+`Casks/freeflow.rb` using the `TAP_BUMP_TOKEN` secret (a fine-grained PAT with
+`contents: write` on `abgregs/homebrew-freeflow` only). Pre-release tags never
+touch the tap.
 
-1. Update `version` and `sha256` in `freeflow.rb` (the `sha256` is the value in
-   the published `FreeFlow-x.y.z.dmg.sha256`). The `url` derives from `version`,
-   so it needs no edit.
-2. Copy the updated `freeflow.rb` to the tap repo's `Casks/freeflow.rb` and push.
-3. Verify: `brew install --cask abgregs/freeflow/freeflow`.
+The tap is therefore a **generated artifact**: the cask's shape (`name`, `desc`,
+`depends_on`, `caveats`, `zap`, the `url` pattern) is reviewed here, in this
+template, and never edited by hand in the tap. If the tap push step ever fails
+(the release itself is already published at that point), the manual fallback is
+the same substitution: copy this file across with the new `version`/`sha256`
+and push.
 
-This bump is manual for V1. Automating it (the release workflow opening a PR
-against the tap repo via a cross-repo token) is a future enhancement — kept out
-of V1 to avoid handling a second repo's write credential in CI.
+Verify after a release: `brew install --cask abgregs/freeflow/freeflow`.
 
 ## Related
 

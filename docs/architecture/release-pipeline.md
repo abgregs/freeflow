@@ -15,7 +15,11 @@ implements the security requirements in
 On a `v*` tag push, on an Apple Silicon runner:
 
 1. Checks out the tagged commit (build provenance — the tag is the only input).
-2. Stamps the version from the tag into `Info.plist`.
+2. Extracts the tag's `## [x.y.z]` section from `CHANGELOG.md`
+   ([`scripts/extract-changelog`](../../scripts/extract-changelog)) — a real
+   release with no section **fails here**, before anything is signed or
+   published; a suffixed pre-release tag falls back to generated notes
+   (planning 0013). Then stamps the version from the tag into `Info.plist`.
 3. Imports the Developer ID cert into an **ephemeral keychain**.
 4. `make verify` — builds release, assembles the bundle, signs with Developer ID
    (`--options runtime`), and runs the `codesign -dv` identifier check. Passes
@@ -26,8 +30,14 @@ On a `v*` tag push, on an Apple Silicon runner:
    notarizes, and staples it.
 7. EdDSA-signs the DMG with `sign_update` and writes a single-item Sparkle
    appcast ([`scripts/make-appcast`](../../scripts/make-appcast)) — planning 0009.
-8. Publishes the DMG + a SHA-256 checksum + `appcast.xml` to the GitHub Release.
-9. Tears down the keychain and key material — even on failure.
+8. Publishes the DMG + a SHA-256 checksum + `appcast.xml` to the GitHub
+   Release, with the curated `CHANGELOG.md` section as the release body (the
+   same text feeds the appcast `<description>`).
+9. Renders the cask template ([`packaging/homebrew/freeflow.rb`](../../packaging/homebrew/freeflow.rb))
+   with the new `version` + published `sha256` and pushes it to the tap repo's
+   `Casks/freeflow.rb` via `TAP_BUMP_TOKEN` — releases only, never
+   pre-releases (planning 0013).
+10. Tears down the keychain and key material — even on failure.
 
 `SUFeedURL` points at `/releases/latest/download/appcast.xml`, which always
 resolves to the newest **non-pre-release** release's asset. Each release attaches
@@ -47,6 +57,7 @@ test tags publish as pre-releases and are therefore invisible to Sparkle users.
 | `NOTARY_API_KEY_ID` | The API key's Key ID |
 | `NOTARY_API_ISSUER_ID` | The API key's Issuer ID |
 | `SPARKLE_PRIVATE_KEY` | Base64 EdDSA private key that signs the Sparkle appcast (planning 0009) |
+| `TAP_BUMP_TOKEN` | Fine-grained PAT, `contents: write` on `abgregs/homebrew-freeflow` **only** — pushes the rendered cask on each release (planning 0013) |
 
 App Store Connect API key is used over an Apple ID + app-specific password — it
 is revocable, has no 2FA interactivity, and scopes to notarization.
@@ -81,18 +92,32 @@ no unpinned action or extra download (0005 workflow hardening).
    Until both are in place, builds still ship, but Sparkle updates fail signature
    verification (safe-by-default) and the appcast step fails loudly on the
    missing secret.
+6. **Tap-bump token (one-time, planning 0013):** create a **fine-grained PAT**
+   restricted to the `abgregs/homebrew-freeflow` repository with the
+   `Contents: Read and write` permission and nothing else; store it as the
+   `TAP_BUMP_TOKEN` secret. Least-privilege and revocable — it cannot touch
+   this repo. The tap-bump step fails loudly if it's unset.
 
 ## Cutting a release
+
+1. Rename `CHANGELOG.md`'s `## [Unreleased]` section to `## [x.y.z] - <date>` —
+   that rename is the deliberate "these are the release notes" moment; the
+   workflow only reads it, never writes prose. A missing section fails the
+   release before any artifact is built.
+2. Tag:
 
 ```bash
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-Then: watch the Action, confirm the Release has `FreeFlow-0.1.0.dmg` +
-`.dmg.sha256`, and bump the Homebrew cask
-([../../packaging/homebrew/README.md](../../packaging/homebrew/README.md)).
-Releases are **immutable** — to fix a bad build, tag a new version; never
-replace an asset under an existing tag.
+Then: watch the Action and confirm the Release has `FreeFlow-0.1.0.dmg` +
+`.dmg.sha256` + `appcast.xml` with the changelog section as its body, and that
+the tap's `Casks/freeflow.rb` was bumped (release notes and cask are both
+automated — planning 0013). Releases are **immutable** — to fix a bad build,
+tag a new version; never replace an asset under an existing tag. If only the
+tap-bump step fails, the release is already live: fix the cause and re-run the
+failed job, or fall back to the manual copy described in
+[../../packaging/homebrew/README.md](../../packaging/homebrew/README.md).
 
 The workflow validates the tag is `vX.Y.Z` (or `vX.Y.Z-suffix`) and fails fast
 otherwise, before any signing.

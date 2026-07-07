@@ -1,10 +1,12 @@
 # Source-of-truth template for the Homebrew cask. The live copy lives in the
-# separate tap repo (abgregs/homebrew-freeflow) at Casks/freeflow.rb. On each
-# release, bump `version` and `sha256` (from the published FreeFlow-x.y.z.dmg.sha256)
-# and copy this file across. See packaging/homebrew/README.md.
+# separate tap repo (abgregs/homebrew-freeflow) at Casks/freeflow.rb and is a
+# GENERATED artifact: on each release tag, release.yml substitutes `version`
+# and `sha256` (from the published FreeFlow-x.y.z.dmg.sha256) into this
+# template and pushes the result to the tap (planning 0013). Edit the cask's
+# shape here — never by hand in the tap. See packaging/homebrew/README.md.
 cask "freeflow" do
   version "0.1.0"
-  sha256 "8addae1306d18974608792ce476b935f4fcbf7a4014484b4022ea9e80360eab0" # release .sha256
+  sha256 "8addae1306d18974608792ce476b935f4fcbf7a4014484b4022ea9e80360eab0" # from the published .dmg.sha256
 
   url "https://github.com/abgregs/freeflow/releases/download/v#{version}/FreeFlow-#{version}.dmg"
   name "Free Flow"
