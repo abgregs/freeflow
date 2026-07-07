@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             audio: AudioCaptureManager(microphone: microphone),
             textInsertion: TextInsertionManager(accessibility: accessibility),
             transcription: transcription,
+            mediaPause: MediaPauseManager(),
             settings: settings
         )
     }()

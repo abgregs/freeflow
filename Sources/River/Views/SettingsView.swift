@@ -11,6 +11,8 @@ struct SettingsView: View {
     private var launchAtLogin: Bool = Settings.launchAtLogin.defaultValue
     @AppStorage(Settings.playFeedbackSounds.name)
     private var playFeedbackSounds: Bool = Settings.playFeedbackSounds.defaultValue
+    @AppStorage(Settings.pauseMediaWhileDictating.name)
+    private var pauseMediaWhileDictating: Bool = Settings.pauseMediaWhileDictating.defaultValue
     @AppStorage(Settings.selectedModel.name)
     private var selectedModel: String = Settings.selectedModel.defaultValue
 
@@ -24,7 +26,7 @@ struct SettingsView: View {
             aboutSection
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 520)
+        .frame(width: 480, height: 556)
     }
 
     private var activationSection: some View {
@@ -78,6 +80,7 @@ struct SettingsView: View {
                     updateLaunchAtLogin(enabled)
                 }
             Toggle("Sound effects", isOn: $playFeedbackSounds)
+            Toggle("Pause media while dictating", isOn: $pauseMediaWhileDictating)
         }
     }
 
