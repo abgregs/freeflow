@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 import os
@@ -33,6 +34,15 @@ final class FreeFlowSession {
     private let transcription: TranscriptionManager
     private let settings: SettingsStore
 
+    // The most recent successful transcription, retained in memory for user-initiated
+    // recovery (planning 0019). Set on transcription success — including when the paste
+    // then fails, which is the recovery case (AC1). Never persisted, never logged.
+    // `didSet` keeps the availability subject in sync.
+    private var lastTranscript: String? {
+        didSet { lastTranscriptAvailableSubject.send(lastTranscript != nil) }
+    }
+    private let lastTranscriptAvailableSubject = CurrentValueSubject<Bool, Never>(false)
+
     private var isStarted = false
     private var cancellables = Set<AnyCancellable>()
     // A list, not a single slot: two settings (key + mode) can both be deferred
@@ -65,6 +75,11 @@ final class FreeFlowSession {
     // Recording-context notices (e.g. "activation key changed — press it to stop").
     // Same observers as `errors`; shown in the menu bar now, the HUD later.
     var notices: AnyPublisher<String, Never> { noticeSubject.eraseToAnyPublisher() }
+    // Availability signal for the "Copy Last Transcription" menu item (planning 0019).
+    // Emits `true` after the first successful transcription; `AppState` bridges it.
+    var lastTranscriptAvailable: AnyPublisher<Bool, Never> { lastTranscriptAvailableSubject.eraseToAnyPublisher() }
+    // internal for testability — availability only, never the content.
+    var hasLastTranscript: Bool { lastTranscript != nil }
 
     init(
         accessibility: AccessibilityCapability,
@@ -101,6 +116,25 @@ final class FreeFlowSession {
         await hotkey.stop()
         cancellables.removeAll()
         logger.info("FreeFlowSession stopped")
+    }
+
+    /// Writes the last retained transcription to the general pasteboard.
+    /// No-op when no transcription has been retained yet.
+    ///
+    /// User-initiated only — the automated insertion cycle never touches the
+    /// clipboard (planning 0011). Applies nspasteboard.org marker types so
+    /// well-behaved clipboard managers skip recording the dictated content.
+    func copyLastTranscript() {
+        guard let text = lastTranscript else { return }
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        for rawType in Constants.pasteboardMarkerTypes {
+            item.setData(Data(), forType: NSPasteboard.PasteboardType(rawType))
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.writeObjects([item])
+        // Content is never logged — only its count; see logging.md anti-pattern #4.
+        logger.info("Copied last transcript to pasteboard (\(text.count, privacy: .public) chars)")
     }
 
     // internal for testability — wires hotkey callbacks without starting the
@@ -166,6 +200,10 @@ final class FreeFlowSession {
                 do {
                     let text = try await transcription.transcribe(audioSamples: samples)
                     logger.info("Transcribed \(text.count, privacy: .public) chars")
+                    // Retain before the paste attempt: recovery is available even
+                    // when insertion fails (planning 0019 AC1). Content is never
+                    // logged — only its count is; see logging.md anti-pattern #4.
+                    lastTranscript = text
                     do {
                         try await textInsertion.insertText(text)
                     } catch {
