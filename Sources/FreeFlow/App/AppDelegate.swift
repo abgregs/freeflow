@@ -11,7 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let microphone = MicrophoneCapability()
     let inputMonitoring = InputMonitoringCapability()
     let settings = SettingsStore()
-    let transcription = TranscriptionService()
+    let transcription = TranscriptionManager()
     let appState = AppState()
 
     private(set) lazy var session: FreeFlowSession = {
