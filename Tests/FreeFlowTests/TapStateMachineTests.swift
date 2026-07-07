@@ -81,4 +81,17 @@ struct TapStateMachineTests {
         let machine = TapStateMachine(mode: .hold, windowMs: 400, now: { 0 })
         #expect(machine.handleTap() == .none)
     }
+
+    @MainActor
+    @Test("reset returns to idle without firing a spurious stop")
+    func resetReturnsToIdle() {
+        // reset drops any in-flight recording/detection back to the start state.
+        // The next tap must behave like a fresh start (.start), not a stop of the
+        // discarded recording — a stray .stop here would desync the session.
+        let machine = TapStateMachine(mode: .singleTap, windowMs: 400, now: { 0 })
+        #expect(machine.handleTap() == .start)   // now .recording
+        machine.reset()
+        #expect(machine.state == .idle)
+        #expect(machine.handleTap() == .start)   // fresh start, not a stop
+    }
 }
