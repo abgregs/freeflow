@@ -1,8 +1,23 @@
 # Planning: Custom Dictionary Redesign (roadmap 0008)
 
+> **Status (2026-07-06): the redesign is dropped.** Decision from the
+> transcription-quality review: dictionary/glossary layers — including role
+> packs and any per-role or per-app vocabulary personalization — are out of
+> scope for this project. The posture on record is to use off-the-shelf models
+> as-is and improve quality by choosing better models
+> ([0021](0021_model-picker.md), informed by
+> [0022](0022_transcription-eval-harness.md)) and hardening decoding
+> ([0023](0023_silence-decoding-hardening.md), which absorbs this spec's
+> trailing-silence-trim and `noSpeechThreshold` ideas). The removal task below
+> landed 2026-06-12 and stands; the reserved `customDictionaryTerms` key and
+> the `TranscriptionService` prompt plumbing remain in code but have **no
+> planned consumer**. This spec is retained as the record of the field bug and
+> the decision trail.
+
 The V1 custom dictionary (prompt-token biasing, M8) is **cut from the public
-launch** and redesigned here. Decision made 2026-06-12 after a field bug and a
-feasibility review of the "bigger glossary" direction.
+launch** and was redesigned here. Decision made 2026-06-12 after a field bug
+and a feasibility review of the "bigger glossary" direction. (The redesign
+below is now dropped — see the status above.)
 
 ## Why V1 ships without it
 
