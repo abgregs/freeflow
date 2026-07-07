@@ -27,6 +27,9 @@ final class AppState {
     /// Live input level (0...1) during recording (planning 0020). Zero at rest and
     /// whenever not recording, so the HUD meter sits still outside a capture.
     private(set) var inputLevel: Float = 0
+    /// Whether the session has retained a transcript for recovery (planning 0019).
+    /// Availability only — content stays in the session, never in the UI layer.
+    private(set) var hasLastTranscript: Bool = false
 
     @ObservationIgnored private var cancellables = Set<AnyCancellable>()
     @ObservationIgnored private let scheduleToastDismiss: ToastScheduler
@@ -48,6 +51,9 @@ final class AppState {
             .store(in: &cancellables)
         session.notices
             .sink { [weak self] notice in self?.apply(notice: notice) }
+            .store(in: &cancellables)
+        session.lastTranscriptAvailable
+            .sink { [weak self] available in self?.apply(hasLastTranscript: available) }
             .store(in: &cancellables)
     }
 
@@ -126,6 +132,13 @@ final class AppState {
     func apply(inputLevel level: Float) {
         guard state == .recording else { return }
         inputLevel = level
+    }
+
+    // internal for testability — drives `hasLastTranscript` from the session's
+    // `lastTranscriptAvailable` publisher (planning 0019). Availability only —
+    // the content stays in the session.
+    func apply(hasLastTranscript available: Bool) {
+        hasLastTranscript = available
     }
 
     // internal for testability — clears the toast when its timer fires. Separate so

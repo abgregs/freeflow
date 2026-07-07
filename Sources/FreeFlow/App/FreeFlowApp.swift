@@ -7,9 +7,11 @@ struct FreeFlowApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarContent(appState: appDelegate.appState) {
+            MenuBarContent(appState: appDelegate.appState, cancel: {
                 appDelegate.session.handleCancel()
-            }
+            }, copyLastTranscript: {
+                appDelegate.session.copyLastTranscript()
+            })
         } label: {
             MenuBarLabel(appState: appDelegate.appState)
         }
@@ -38,6 +40,9 @@ private struct MenuBarContent: View {
     /// discoverable path to cancel — the mouse-free counterpart is the fn-key
     /// gesture in `HotkeyManager`. Both call the same `FreeFlowSession.handleCancel`.
     let cancel: () -> Void
+    /// Writes the last retained transcript to the clipboard (planning 0019).
+    /// User-initiated write — the automated cycle never touches the clipboard.
+    let copyLastTranscript: () -> Void
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -59,6 +64,11 @@ private struct MenuBarContent: View {
             Button("Cancel Recording", role: .destructive, action: cancel)
                 .keyboardShortcut(".")
         }
+        Divider()
+        // Disabled before the first cycle; enabled after any successful transcription
+        // (including when paste fails, which is exactly the recovery case).
+        Button("Copy Last Transcription", action: copyLastTranscript)
+            .disabled(!appState.hasLastTranscript)
         Divider()
         Button("Settings…") {
             NSApp.activate(ignoringOtherApps: true)
