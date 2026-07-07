@@ -63,6 +63,45 @@ struct AudioCaptureCycleTests {
     }
 }
 
+@Suite("AudioCaptureManager discard")
+struct AudioCaptureDiscardTests {
+    // The cancel path (planning 0017): discardRecording drops captured buffers and
+    // stops the engine WITHOUT converting or returning them — the counterpart to
+    // stopRecording's convert-and-return.
+
+    @MainActor
+    @Test("discardRecording drops captured buffers so a later stop sees no audio")
+    func discardDropsBuffers() async throws {
+        // Capture a real (voiced) buffer, then discard. Re-arming a fresh recording
+        // and stopping it with no new buffer must throw .noAudioCaptured — proof the
+        // discarded buffers were dropped, not carried into the next recording.
+        let microphone = MicrophoneCapability()
+        microphone.skipEngineForTesting = true
+        let manager = AudioCaptureManager(microphone: microphone)
+
+        await manager.startRecording()
+        microphone.publishForTest(makeSineBuffer(milliseconds: 100, frequency: 440, amplitude: 0.5))
+        await manager.discardRecording()
+
+        await manager.startRecording()  // fresh recording, no buffer published
+        await #expect(throws: AudioCaptureError.self) {
+            _ = try await manager.stopRecording()
+        }
+    }
+
+    @MainActor
+    @Test("discardRecording is safe when nothing was captured")
+    func discardWithNothingCaptured() async {
+        // Cancel can arrive before any buffer landed (a stray key-brush). Discard
+        // must not throw or wait — it simply tears down and drops nothing.
+        let microphone = MicrophoneCapability()
+        microphone.skipEngineForTesting = true
+        let manager = AudioCaptureManager(microphone: microphone)
+        await manager.startRecording()
+        await manager.discardRecording()  // no throw, no warmup wait
+    }
+}
+
 @Suite("AudioCaptureManager sample-rate conversion")
 struct AudioCaptureConvertTests {
     @MainActor

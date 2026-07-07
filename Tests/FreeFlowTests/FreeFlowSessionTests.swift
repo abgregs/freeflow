@@ -318,6 +318,123 @@ struct FreeFlowSessionTests {
     }
 
     @MainActor
+    @Test("cancel from .recording returns to .idle with no error and a canceled notice")
+    func cancelFromRecordingReturnsToIdle() async throws {
+        // Planning 0017 AC1: the discard transition ends the recording with NO
+        // transcription and NO paste (structural — handleCancel never calls either),
+        // no error on the cycle-failure channel, and a visible "canceled" notice.
+        let env = makeSession()
+        try await env.session.start()
+
+        var errors: [FreeFlowError] = []
+        var notices: [String] = []
+        let errToken = env.session.errors.sink { errors.append($0) }
+        let noticeToken = env.session.notices.sink { notices.append($0) }
+        defer { errToken.cancel(); noticeToken.cancel() }
+
+        env.session.handleActivate()
+        try await Task.sleep(nanoseconds: 20_000_000)  // let startRecording subscribe
+        #expect(env.session.currentState == .recording)
+
+        env.session.handleCancel()
+
+        #expect(env.session.currentState == .idle)
+        #expect(errors.isEmpty)                                      // no cycle error
+        #expect(notices == [ActivationNotice.recordingCanceled])    // visible, not silent
+    }
+
+    @MainActor
+    @Test("cancel while .idle is a no-op")
+    func cancelWhileIdleIsNoOp() async throws {
+        // Planning 0017 AC2: cancel outside .recording changes nothing and emits
+        // no notice (logged only).
+        let env = makeSession()
+        try await env.session.start()
+        var notices: [String] = []
+        let token = env.session.notices.sink { notices.append($0) }
+        defer { token.cancel() }
+
+        env.session.handleCancel()
+
+        #expect(env.session.currentState == .idle)
+        #expect(notices.isEmpty)
+    }
+
+    @MainActor
+    @Test("cancel while .processing is a no-op (out of scope)")
+    func cancelWhileProcessingIsNoOp() async throws {
+        // Planning 0017: cancel during .processing is ignored — transcription is
+        // already in flight and the paste is imminent. Drive into .processing by
+        // starting handleDeactivate with no buffer (it sits in the ~300 ms warmup
+        // wait), cancel during that window, and confirm the state is unaffected.
+        let env = makeSession()
+        try await env.session.start()
+        var notices: [String] = []
+        let token = env.session.notices.sink { notices.append($0) }
+        defer { token.cancel() }
+
+        env.session.handleActivate()
+        let deactivate = Task { @MainActor in await env.session.handleDeactivate() }
+        try await Task.sleep(nanoseconds: 20_000_000)  // now in .processing, mid-warmup-wait
+        #expect(env.session.currentState == .processing)
+
+        env.session.handleCancel()
+        #expect(env.session.currentState == .processing)  // unaffected
+        #expect(notices.isEmpty)
+
+        await deactivate.value                              // let the cycle finish
+        #expect(env.session.currentState == .idle)
+    }
+
+    @MainActor
+    @Test("a settings change deferred during a canceled recording still applies on return to .idle")
+    func pendingReconfigurationAppliesOnCancel() async throws {
+        // Planning 0017 AC3: the cancel path runs the same deferral loop as the
+        // normal cycle end. A key change parked during the (Hold-mode) recording
+        // must land when cancel returns the session to .idle — cancel is not a
+        // shortcut that skips the deferral contract.
+        let env = makeSession()
+        try await env.session.start()
+        let baseline = env.session.configurationApplyCount
+
+        env.session.handleActivate()
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        env.store.setValue(59, for: Settings.activationKeyCode)  // deferred (Hold recording)
+        #expect(env.session.configurationApplyCount == baseline)  // parked, not applied
+        #expect(env.session.configurationDeferCount == 1)
+
+        env.session.handleCancel()
+
+        #expect(env.session.currentState == .idle)
+        #expect(env.session.configurationApplyCount == baseline + 1)  // pending applied on cancel
+    }
+
+    @MainActor
+    @Test("a model switch deferred during a canceled recording still applies on return to .idle")
+    func pendingModelSwitchAppliesOnCancel() async throws {
+        // The model-switch deferral (planning 0021) shares the cancel return-to-idle
+        // path: a switch parked mid-recording applies when cancel ends the cycle.
+        let env = makeSession()
+        try await env.session.start()
+        let applyBaseline = env.session.modelReloadApplyCount
+
+        env.session.handleActivate()
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        env.store.setValue("openai_whisper-base.en", for: Settings.selectedModel)
+        #expect(env.session.modelReloadApplyCount == applyBaseline)  // parked
+        #expect(env.session.modelReloadDeferCount == 1)
+
+        env.session.handleCancel()
+
+        #expect(env.session.currentState == .idle)
+        #expect(env.session.modelReloadApplyCount == applyBaseline + 1)  // applied on cancel
+        await waitUntil { env.transcription.currentModelName == "openai_whisper-base.en" }
+        #expect(env.transcription.currentModelName == "openai_whisper-base.en")
+    }
+
+    @MainActor
     @Test("handleActivate is a no-op outside .idle")
     func handleActivateRejectsNonIdle() {
         let env = makeSession()
