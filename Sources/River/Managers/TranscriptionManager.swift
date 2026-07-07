@@ -136,7 +136,20 @@ final class TranscriptionManager {
     }
 
     private func decode(_ audioSamples: [Float], promptTokens: [Int], using whisperKit: WhisperKit) async throws -> String {
-        let options = DecodingOptions(promptTokens: promptTokens.isEmpty ? nil : promptTokens)
+        // Pin the no-speech / log-prob gate and the temperature-fallback schedule
+        // to upstream Whisper defaults (planning 0023). WhisperKit 0.18 already
+        // defaults to these, but setting them explicitly keeps the gate from
+        // silently regressing if an upstream default changes. Values live in
+        // `Constants`, not settings — the user shouldn't reason about them.
+        let options = DecodingOptions(
+            temperature: Constants.decodingTemperature,
+            temperatureIncrementOnFallback: Constants.decodingTemperatureIncrementOnFallback,
+            temperatureFallbackCount: Constants.decodingTemperatureFallbackCount,
+            promptTokens: promptTokens.isEmpty ? nil : promptTokens,
+            compressionRatioThreshold: Constants.compressionRatioThreshold,
+            logProbThreshold: Constants.logProbThreshold,
+            noSpeechThreshold: Constants.noSpeechThreshold
+        )
         let results: [TranscriptionResult]
         do {
             results = try await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options)
