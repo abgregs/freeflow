@@ -48,6 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         RecordingIndicatorCoordinator(appState: appState)
     }()
 
+    private(set) lazy var soundFeedback: SoundFeedbackController = {
+        SoundFeedbackController(appState: appState, settings: settings)
+    }()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Application did finish launching")
         appState.bind(to: session)
@@ -55,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appState.bind(microphone: microphone)
         onboarding.start()
         recordingIndicator.start()
+        soundFeedback.start()
         Task { @MainActor in
             do { try await session.start() }
             catch { logger.error("Failed to start session: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)") }

@@ -27,6 +27,12 @@ enum Settings {
         name: "selectedModel",
         defaultValue: Constants.defaultModel
     )
+    // Play a short system sound on recording start and stop (planning 0016).
+    // Default on — matches the macOS built-in dictation affordance.
+    static let playFeedbackSounds = SettingKey<Bool>(
+        name: "playFeedbackSounds",
+        defaultValue: true
+    )
 }
 
 @MainActor
