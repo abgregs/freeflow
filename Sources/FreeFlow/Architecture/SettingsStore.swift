@@ -33,6 +33,13 @@ enum Settings {
         name: "playFeedbackSounds",
         defaultValue: true
     )
+    // Pause now-playing media when dictation starts; resume when the cycle ends
+    // (planning 0003). Default on — most users dictating over music want this.
+    // Consumer: MediaPauseManager (see architecture/configuration.md).
+    static let pauseMediaWhileDictating = SettingKey<Bool>(
+        name: "pauseMediaWhileDictating",
+        defaultValue: true
+    )
 }
 
 @MainActor
