@@ -14,8 +14,17 @@ final class MicrophoneCapability: Capability {
 
     // fileprivate so the audio tap callback (in this file) can deliver into it.
     fileprivate let audioBufferSubject = PassthroughSubject<AVAudioPCMBuffer, Never>()
+    // Live input level (0...1), throttled — the recording HUD's level meter reads
+    // this so a silent mic is visible *during* capture (planning 0020).
+    private let levelSubject = PassthroughSubject<Float, Never>()
     private var engine: AVAudioEngine?
     private(set) var inputFormat: AVAudioFormat?
+
+    // Throttle state for the level publisher: `nil` until the first sample so the
+    // first buffer always emits. Injectable clock so the ~14 Hz throttle is tested
+    // deterministically (planning 0020 acceptance criterion 3).
+    private let now: () -> TimeInterval
+    private var lastLevelEmit: TimeInterval?
 
     // internal for testability — when true, `startEngine` is a no-op. The test
     // runner often has Microphone permission, so without this `AVAudioEngine.start`
@@ -34,7 +43,14 @@ final class MicrophoneCapability: Capability {
     /// the callback returns.
     var audioBuffers: AnyPublisher<AVAudioPCMBuffer, Never> { audioBufferSubject.eraseToAnyPublisher() }
 
-    init() {
+    /// Throttled input level (0...1) during capture. Emits on the main actor (the
+    /// tap callback hops via `Task { @MainActor in ... }`, same discipline as the
+    /// buffer stream and the event tap). `AppState.bind(microphone:)` subscribes;
+    /// the recording HUD renders it (planning 0020).
+    var inputLevels: AnyPublisher<Float, Never> { levelSubject.eraseToAnyPublisher() }
+
+    init(now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
+        self.now = now
         subject = CurrentValueSubject(Self.readStatus())
     }
 
@@ -72,8 +88,12 @@ final class MicrophoneCapability: Capability {
         engine.inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             guard let self else { return }
             let copy = Self.copy(buffer)
+            // RMS is computed here on the audio thread (pure, no `self` access), so
+            // only the throttled emission crosses to the main actor.
+            let rms = Self.rms(of: buffer)
             Task { @MainActor in
                 self.audioBufferSubject.send(copy)
+                self.emitLevel(rms: rms)
             }
         }
         do {
@@ -94,6 +114,9 @@ final class MicrophoneCapability: Capability {
         engine.stop()
         self.engine = nil
         self.inputFormat = nil
+        // Reset the throttle so the next recording's first buffer emits a level
+        // immediately rather than being gated by the previous recording's timestamp.
+        lastLevelEmit = nil
         audioLogger.info("AVAudioEngine stopped")
     }
 
@@ -102,6 +125,39 @@ final class MicrophoneCapability: Capability {
     // Microphone grant on the running process).
     func publishForTest(_ buffer: AVAudioPCMBuffer) {
         audioBufferSubject.send(buffer)
+    }
+
+    // internal for testability — the throttled level emission, split from the tap
+    // callback so the ~14 Hz throttle is tested with an injected clock without a
+    // real engine (planning 0020 AC3). Emits the normalized level on the main actor;
+    // buffers arriving inside `levelMeterPublishInterval` of the last emission are
+    // dropped (the meter doesn't need every buffer).
+    func emitLevel(rms: Float) {
+        let t = now()
+        if let last = lastLevelEmit, t - last < Constants.levelMeterPublishInterval { return }
+        lastLevelEmit = t
+        levelSubject.send(Self.normalizedLevel(rms: rms))
+    }
+
+    // internal for testability — RMS of a buffer's first channel. Pure and
+    // audio-thread-safe (no `self`), so the tap callback computes it before hopping
+    // to the main actor, and tests exercise it on synthetic loud/quiet/silent
+    // buffers (planning 0020 AC2).
+    static func rms(of buffer: AVAudioPCMBuffer) -> Float {
+        guard let channelData = buffer.floatChannelData, buffer.frameLength > 0 else { return 0 }
+        let count = Int(buffer.frameLength)
+        let samples = channelData[0]
+        var sumSquares: Float = 0
+        for i in 0..<count { sumSquares += samples[i] * samples[i] }
+        return (sumSquares / Float(count)).squareRoot()
+    }
+
+    // internal for testability — maps a linear RMS to a 0...1 meter level. A speech
+    // peak near `levelMeterReferenceRMS` lights the full meter; silence is 0; quiet
+    // speech sits proportionally low. Clamped so a loud transient can't exceed 1.
+    static func normalizedLevel(rms: Float) -> Float {
+        guard rms > 0 else { return 0 }
+        return min(1, rms / Constants.levelMeterReferenceRMS)
     }
 
     private func updateStatus(_ next: CapabilityStatus) {
