@@ -41,11 +41,13 @@ enum MenuBarPresentation {
             return Visual(systemImage: "arrow.down.circle", statusLabel: "Downloading model...")
         case .loading:
             return Visual(systemImage: "ellipsis", statusLabel: "Loading...")
-        case .ready, .failed:
-            // .failed is treated as an error condition; error icon + "Ready" label
-            // keeps the existing behaviour (the session also emits a .transcription
-            // error when the user tries to dictate while not ready).
-            let icon = (hasError || modelLoadState == .failed) ? "exclamationmark.triangle" : "mic"
+        case .failed:
+            // "Ready" here would be the exact lie 0004 removes — dictation cannot
+            // work until relaunch, so the label says so alongside the glyph. (The
+            // session also emits a .transcription error if the user tries anyway.)
+            return Visual(systemImage: "exclamationmark.triangle", statusLabel: "Model failed to load")
+        case .ready:
+            let icon = hasError ? "exclamationmark.triangle" : "mic"
             return Visual(systemImage: icon, statusLabel: "Ready")
         }
     }
