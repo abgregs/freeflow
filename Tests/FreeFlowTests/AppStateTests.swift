@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import Testing
 @testable import FreeFlow
@@ -109,6 +110,77 @@ struct AppStateTests {
         #expect(appState.modelLoadState == .ready)
     }
 
+    // MARK: - Error toast lifecycle (planning 0018)
+
+    @MainActor
+    @Test("a cycle error sets a transient toast alongside the lingering menu-row message")
+    func errorSetsToast() {
+        // Two renderers of one error (planning 0018): the redacted `errorMessage`
+        // is the lingering menu record; the `toast` is the transient HUD alert.
+        let appState = AppState()
+        let error = FreeFlowError.textInsertion(underlying: NSError(domain: "x", code: 1))
+        appState.apply(error)
+        #expect(appState.toast == ErrorToastPresentation.toast(for: error))
+        #expect(appState.errorMessage != nil)
+    }
+
+    @MainActor
+    @Test("the toast auto-clears when its scheduled timer fires (injectable clock)")
+    func toastAutoClearsOnTimer() {
+        // AC1/AC4: the toast auto-dismisses after a bounded duration. An injected
+        // scheduler fires the dismiss synchronously — no wall-clock wait — and
+        // confirms the duration passed is the configured one.
+        let scheduler = ManualToastScheduler()
+        let appState = AppState(scheduleToastDismiss: scheduler.schedule)
+        appState.apply(FreeFlowError.audioCapture(underlying: NSError(domain: "x", code: 1)))
+        #expect(appState.toast != nil)
+        #expect(scheduler.lastDelay == Constants.errorToastDurationSeconds)
+        scheduler.fire()
+        #expect(appState.toast == nil)
+    }
+
+    @MainActor
+    @Test("a fresh recording clears a lingering toast (its timer is moot)")
+    func recordingClearsToast() {
+        let appState = AppState()
+        appState.apply(FreeFlowError.transcription(underlying: NSError(domain: "x", code: 1)))
+        #expect(appState.toast != nil)
+        appState.apply(.recording)
+        #expect(appState.toast == nil)
+    }
+
+    // MARK: - Input level (planning 0020)
+
+    @MainActor
+    @Test("input level is applied only during recording and resets when it ends")
+    func inputLevelGatedByRecording() {
+        // The meter is a *live-capture* signal. A level arriving while idle or
+        // processing (a late buffer) must not raise the meter, and the meter must
+        // sit at rest the moment the recording ends.
+        let appState = AppState()
+        appState.apply(inputLevel: 0.8)
+        #expect(appState.inputLevel == 0)          // ignored while idle
+        appState.apply(.recording)
+        appState.apply(inputLevel: 0.8)
+        #expect(appState.inputLevel == 0.8)        // tracked during recording
+        appState.apply(.processing)
+        #expect(appState.inputLevel == 0)          // reset when recording ends
+    }
+
+    @MainActor
+    @Test("bind(microphone:) forwards the mic's level publisher into the observable")
+    func bindMicrophoneWiresLevel() {
+        // Nothing else asserts `bind(microphone:)` actually connects the publisher;
+        // a dropped sink would pass every `apply(inputLevel:)` test while the HUD
+        // meter silently stays dead. Drive a real emission through the subscription.
+        let mic = MicrophoneCapability(now: { 0 })
+        let appState = AppState()
+        appState.apply(.recording)
+        appState.bind(microphone: mic)
+        mic.emitLevel(rms: Constants.levelMeterReferenceRMS)  // → normalized 1.0
+        #expect(appState.inputLevel == 1.0)
+    }
+
     // MARK: - Test environment
 
     @MainActor
@@ -146,5 +218,28 @@ struct AppStateTests {
         let appState = AppState()
         appState.bind(to: session)
         return BoundEnv(appState: appState, session: session, store: store)
+    }
+}
+
+// Captures the scheduled toast-dismiss instead of dispatching it, so a test fires
+// the auto-clear synchronously and asserts the delay — the injectable-clock pattern
+// (planning 0018 AC4).
+@MainActor
+private final class ManualToastScheduler {
+    private(set) var pending: (@MainActor () -> Void)?
+    private(set) var lastDelay: TimeInterval?
+
+    var schedule: ToastScheduler {
+        { [weak self] delay, action in
+            self?.lastDelay = delay
+            self?.pending = action
+            return AnyCancellable { self?.pending = nil }
+        }
+    }
+
+    func fire() {
+        let action = pending
+        pending = nil
+        action?()
     }
 }
