@@ -11,7 +11,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let microphone = MicrophoneCapability()
     let inputMonitoring = InputMonitoringCapability()
     let settings = SettingsStore()
-    let transcription = TranscriptionManager()
+    // Lazy so the manager loads the persisted `selectedModel` (planning 0021) at
+    // launch, not the compile-time default — otherwise a user who picked a different
+    // model would load `small.en` first and immediately reload on the startup
+    // subscription emission. `settings` is a stored property, so this must be lazy to
+    // read it during construction.
+    private(set) lazy var transcription = TranscriptionManager(
+        modelName: settings.value(for: Settings.selectedModel)
+    )
     let appState = AppState()
 
     private(set) lazy var session: FreeFlowSession = {
