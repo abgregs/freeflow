@@ -30,7 +30,7 @@ final class FreeFlowSession {
     private let hotkey: HotkeyManager
     private let audio: AudioCaptureManager
     private let textInsertion: TextInsertionManager
-    private let transcription: TranscriptionService
+    private let transcription: TranscriptionManager
     private let settings: SettingsStore
 
     private var isStarted = false
@@ -64,7 +64,7 @@ final class FreeFlowSession {
         hotkey: HotkeyManager,
         audio: AudioCaptureManager,
         textInsertion: TextInsertionManager,
-        transcription: TranscriptionService,
+        transcription: TranscriptionManager,
         settings: SettingsStore
     ) {
         self.accessibility = accessibility

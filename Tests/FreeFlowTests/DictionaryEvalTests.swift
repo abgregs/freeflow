@@ -30,7 +30,7 @@ struct DictionaryEvalTests {
         let term = env["FREEFLOW_AB_TERM"] ?? "Vite"
         let model = env["FREEFLOW_AB_MODEL"] ?? Constants.defaultModel
 
-        let service = TranscriptionService(modelName: model)
+        let service = TranscriptionManager(modelName: model)
         service.setCustomDictionaryTerms([term])
         try await service.loadModel()
         let r = try await service.evaluateDictionaryPrompt(wavPath: wavPath)

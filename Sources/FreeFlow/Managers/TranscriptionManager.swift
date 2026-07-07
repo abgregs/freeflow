@@ -26,7 +26,7 @@ enum TranscriptionError: Error, LocalizedError {
 }
 
 @MainActor
-final class TranscriptionService {
+final class TranscriptionManager {
     private let logger = Logger(subsystem: Constants.loggingSubsystem, category: "transcribe")
     private let modelName: String
 
