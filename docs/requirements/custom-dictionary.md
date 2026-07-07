@@ -7,11 +7,16 @@
 > The Settings section, `DictionaryModel`, and the `AppDelegate` wiring are
 > gone — the service's term list is always empty, so the echo bug is
 > structurally impossible (previously persisted terms no longer bias
-> anything). Reserved for the redesign: the `customDictionaryTerms` key,
-> `TranscriptionService`'s prompt plumbing (`buildPromptTokens`, the
-> special-token filter, the empty-decode fallback, the A/B eval harness),
-> and the `small.en` default. The rest of this doc records the V1
-> implementation as it shipped, for the redesign to draw on.
+> anything).
+>
+> **Update (2026-07-06): the 0008 redesign is dropped** — dictionary/glossary
+> layers are out of scope; transcription quality is pursued through model
+> selection and decoding hardening instead (see 0008's status notice). The
+> `customDictionaryTerms` key and `TranscriptionService`'s prompt plumbing
+> (`buildPromptTokens`, the special-token filter, the empty-decode fallback,
+> the A/B eval harness) remain in code but have **no planned consumer**; the
+> `small.en` default stands on its own accuracy rationale. The rest of this
+> doc records the V1 implementation as it shipped, as a historical record.
 
 The user can add terms to a custom dictionary that biases WhisperKit toward recognizing those words. Useful for proper nouns, technical jargon, and personal names that Whisper's general model tends to mishear.
 
