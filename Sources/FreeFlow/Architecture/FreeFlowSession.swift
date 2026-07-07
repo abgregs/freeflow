@@ -32,6 +32,7 @@ final class FreeFlowSession {
     private let audio: AudioCaptureManager
     private let textInsertion: TextInsertionManager
     private let transcription: TranscriptionManager
+    private let mediaPause: MediaPauseManager
     private let settings: SettingsStore
 
     // The most recent successful transcription, retained in memory for user-initiated
@@ -89,6 +90,7 @@ final class FreeFlowSession {
         audio: AudioCaptureManager,
         textInsertion: TextInsertionManager,
         transcription: TranscriptionManager,
+        mediaPause: MediaPauseManager,
         settings: SettingsStore
     ) {
         self.accessibility = accessibility
@@ -98,6 +100,7 @@ final class FreeFlowSession {
         self.audio = audio
         self.textInsertion = textInsertion
         self.transcription = transcription
+        self.mediaPause = mediaPause
         self.settings = settings
     }
 
@@ -166,6 +169,14 @@ final class FreeFlowSession {
         }
         stateSubject.send(.recording)
         logger.info("State -> recording")
+        // Pause now-playing media when the setting is on. pauseIfPlaying() is
+        // fire-and-forget (reads state via async MediaRemote callback). The begin
+        // sound cue fires concurrently via AppState observation; in practice the
+        // cue plays first (NSSound schedules synchronously) and media pauses
+        // shortly after — acceptable per planning 0003.
+        if settings.value(for: Settings.pauseMediaWhileDictating) {
+            mediaPause.pauseIfPlaying()
+        }
         let audio = self.audio
         Task { @MainActor in await audio.startRecording() }
     }
@@ -221,6 +232,7 @@ final class FreeFlowSession {
         }
         stateSubject.send(.idle)
         logger.info("State -> idle")
+        mediaPause.resumeIfPaused()
         applyPendingReconfigurations()
         applyPendingModelSwitch()
     }
@@ -246,6 +258,7 @@ final class FreeFlowSession {
         Task { @MainActor in await audio.discardRecording() }
         stateSubject.send(.idle)
         logger.info("State -> idle (canceled)")
+        mediaPause.resumeIfPaused()
         noticeSubject.send(ActivationNotice.recordingCanceled)
         applyPendingReconfigurations()
         applyPendingModelSwitch()
