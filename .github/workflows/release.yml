@@ -56,6 +56,26 @@ jobs:
           { echo "VERSION=$VERSION"; echo "VERSION_CORE=$VERSION_CORE"; echo "PRERELEASE=$PRERELEASE"; } >> "$GITHUB_ENV"
           echo "Release $VERSION (core $VERSION_CORE, prerelease=$PRERELEASE) from $GITHUB_REF_NAME"
 
+      # Release notes come from the curated CHANGELOG section, not PR titles
+      # (planning 0013). A real release with no section fails HERE — before any
+      # signing, notarization, or upload — so a forgotten changelog entry can
+      # never publish. A suffixed pre-release tag may predate its section (the
+      # changelog is curated at release time), so it falls back to generated
+      # notes instead of failing.
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          set -euo pipefail
+          NOTES="$RUNNER_TEMP/release-notes.md"
+          if scripts/extract-changelog "$VERSION_CORE" > "$NOTES"; then
+            echo "NOTES_FILE=$NOTES" >> "$GITHUB_ENV"
+          elif [ "$PRERELEASE" = "true" ]; then
+            echo "No CHANGELOG section for $VERSION_CORE; pre-release falls back to generated notes."
+            echo "NOTES_FILE=" >> "$GITHUB_ENV"
+          else
+            echo "::error::CHANGELOG.md has no '## [$VERSION_CORE]' section — rename '## [Unreleased]' before tagging (planning 0013)."
+            exit 1
+          fi
+
       # The tag is the single source of truth for the version (0005 build
       # provenance — build the tagged commit only, no arbitrary inputs).
       - name: Stamp version into Info.plist
@@ -159,7 +179,9 @@ jobs:
           MIN_SYSTEM="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Sources/FreeFlow/Resources/Info.plist)"
           # sparkle:version is CFBundleVersion (the monotonic build number Sparkle
           # compares) — the same GITHUB_RUN_NUMBER stamped into the plist above.
-          scripts/make-appcast "$DOWNLOAD_URL" "$VERSION_CORE" "$GITHUB_RUN_NUMBER" "$MIN_SYSTEM" "$SIG_ATTRS" > appcast.xml
+          # The curated CHANGELOG section doubles as the appcast description
+          # (planning 0013) — one extraction feeds both channels.
+          scripts/make-appcast "$DOWNLOAD_URL" "$VERSION_CORE" "$GITHUB_RUN_NUMBER" "$MIN_SYSTEM" "$SIG_ATTRS" ${NOTES_FILE:+"$NOTES_FILE"} > appcast.xml
           echo "APPCAST=appcast.xml" >> "$GITHUB_ENV"
 
       # Artifact integrity (0005): publish a SHA-256 next to the DMG. Releases
@@ -174,9 +196,54 @@ jobs:
           # safe way to exercise the pipeline without minting a "real" release.
           # The appcast rides along on every release; SUFeedURL points at
           # /releases/latest/download/appcast.xml, which skips pre-releases.
-          args=( "$GITHUB_REF_NAME" "$DMG" "$DMG.sha256" "$APPCAST" --title "$GITHUB_REF_NAME" --generate-notes )
+          # Release body = the curated CHANGELOG section (planning 0013);
+          # --generate-notes is only the pre-release fallback when no section
+          # exists yet.
+          args=( "$GITHUB_REF_NAME" "$DMG" "$DMG.sha256" "$APPCAST" --title "$GITHUB_REF_NAME" )
+          if [ -n "${NOTES_FILE:-}" ]; then
+            args+=( --notes-file "$NOTES_FILE" )
+          else
+            args+=( --generate-notes )
+          fi
           if [ "$PRERELEASE" = "true" ]; then args+=( --prerelease ); fi
           gh release create "${args[@]}"
+
+      # The tap repo becomes a generated artifact of the release (planning 0013):
+      # the reviewed template in packaging/homebrew/ owns the cask's shape; only
+      # `version` and `sha256` are substituted — the sha256 is read from the
+      # just-published checksum file, never recomputed. Pre-releases never reach
+      # the tap. TAP_BUMP_TOKEN is a fine-grained PAT scoped to contents:write on
+      # abgregs/homebrew-freeflow ONLY (0005 credential principles) — the default
+      # GITHUB_TOKEN cannot write to a second repo. Plain git over a pinned
+      # third-party bump action: fewer moving parts to audit.
+      - name: Bump the Homebrew tap cask
+        if: env.PRERELEASE == 'false'
+        env:
+          TAP_BUMP_TOKEN: ${{ secrets.TAP_BUMP_TOKEN }}
+        run: |
+          set -euo pipefail   # deliberately NO `set -x` — never trace the token
+          if [ -z "${TAP_BUMP_TOKEN:-}" ]; then
+            echo "::error::TAP_BUMP_TOKEN secret is unset — create a fine-grained PAT with contents:write on abgregs/homebrew-freeflow only (see docs/architecture/release-pipeline.md)."
+            exit 1
+          fi
+          SHA="$(cut -d' ' -f1 "$DMG.sha256")"
+          sed -e "s|^  version \".*$|  version \"$VERSION\"|" \
+              -e "s|^  sha256 \".*$|  sha256 \"$SHA\" # from the published .dmg.sha256|" \
+              packaging/homebrew/freeflow.rb > "$RUNNER_TEMP/freeflow.rb"
+          TAP_DIR="$RUNNER_TEMP/homebrew-freeflow"
+          GIT_TERMINAL_PROMPT=0 git clone --depth 1 \
+            "https://x-access-token:${TAP_BUMP_TOKEN}@github.com/abgregs/homebrew-freeflow.git" "$TAP_DIR"
+          mkdir -p "$TAP_DIR/Casks"
+          cp "$RUNNER_TEMP/freeflow.rb" "$TAP_DIR/Casks/freeflow.rb"
+          cd "$TAP_DIR"
+          if git diff --quiet; then
+            echo "Cask already at $VERSION; nothing to push."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -am "freeflow $VERSION"
+          git push
 
       # Runs even on failure: no signing material survives the job (0005).
       - name: Tear down signing material
