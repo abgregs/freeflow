@@ -11,3 +11,6 @@ xcuserdata/
 # Custom-dictionary A/B eval harness artifacts (local only — see DictionaryEvalTests)
 ab-result.txt
 *.m4a
+
+# Transcription eval scorecards (local only — see TranscriptionEvalTests, planning 0022)
+eval-*.txt
