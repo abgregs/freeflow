@@ -28,8 +28,11 @@ struct SoundFeedbackControllerTests {
         #expect(SoundFeedbackController.cue(from: .idle, to: .processing) == nil)
     }
 
-    @Test("recording→idle produces no cue")
+    @Test("recording→idle (a canceled recording) produces no cue")
     func recordingToIdleIsNil() {
+        // Planning 0017: cancel transitions .recording → .idle directly. That is
+        // deliberately silent — the end cue means "now transcribing," which a
+        // discard is not.
         #expect(SoundFeedbackController.cue(from: .recording, to: .idle) == nil)
     }
 

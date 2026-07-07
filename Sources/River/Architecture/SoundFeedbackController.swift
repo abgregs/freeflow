@@ -82,6 +82,11 @@ final class SoundFeedbackController {
         switch (from, to) {
         case (.idle, .recording):       return .begin
         case (.recording, .processing): return .end
+        // A canceled recording (planning 0017) transitions `.recording → .idle`
+        // directly, never through `.processing`. That is deliberately silent — no
+        // end cue: the end cue means "speech captured, now transcribing," which a
+        // discard is not. The menu/HUD "Recording canceled." notice carries it.
+        case (.recording, .idle):       return nil
         default:                        return nil
         }
     }
