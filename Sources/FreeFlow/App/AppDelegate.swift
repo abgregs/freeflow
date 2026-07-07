@@ -40,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Application did finish launching")
         appState.bind(to: session)
+        appState.bind(transcription: transcription)
         onboarding.start()
         Task { @MainActor in
             do { try await session.start() }

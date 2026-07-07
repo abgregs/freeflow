@@ -24,7 +24,8 @@ private struct MenuBarLabel: View {
     var body: some View {
         Image(systemName: MenuBarPresentation.visual(
             state: appState.state,
-            hasError: appState.errorMessage != nil
+            hasError: appState.errorMessage != nil,
+            modelLoadState: appState.modelLoadState
         ).systemImage)
     }
 }
@@ -35,7 +36,9 @@ private struct MenuBarContent: View {
 
     var body: some View {
         Text(MenuBarPresentation.visual(
-            state: appState.state, hasError: appState.errorMessage != nil
+            state: appState.state,
+            hasError: appState.errorMessage != nil,
+            modelLoadState: appState.modelLoadState
         ).statusLabel)
         if let errorMessage = appState.errorMessage {
             Text(errorMessage)

@@ -1,6 +1,25 @@
+import Combine
 import Foundation
 import WhisperKit
 import os
+
+/// Load lifecycle for the transcription model, published so the menu bar can
+/// show an honest status during the download/load window on launch.
+///
+/// State machine:
+///   (cold) downloading → loading → ready
+///   (warm)              loading → ready
+///   (error) any        →          failed
+enum ModelLoadState: Equatable {
+    /// Model files are being fetched from the network (cold launch only).
+    case downloading
+    /// Files are on disk; CoreML models are loading into memory.
+    case loading
+    /// Model is warm and ready for inference.
+    case ready
+    /// Load failed permanently; re-launch required.
+    case failed
+}
 
 enum TranscriptionError: Error, LocalizedError {
     /// `transcribe` was called before `loadModel` completed. The session
@@ -33,6 +52,20 @@ final class TranscriptionManager {
     private var whisperKit: WhisperKit?
     private var loadTask: Task<WhisperKit, Error>?
 
+    // Published model load state — the menu bar observes this to show an honest
+    // "Downloading…" / "Loading…" / "Ready" status during the launch window.
+    // Initialized from a synchronous disk check so the first emitted value is
+    // already correct when `bind(transcription:)` subscribes in AppDelegate.
+    private let loadStateSubject: CurrentValueSubject<ModelLoadState, Never>
+
+    /// Observable publisher of the model load lifecycle.
+    var modelLoadState: AnyPublisher<ModelLoadState, Never> {
+        loadStateSubject.eraseToAnyPublisher()
+    }
+
+    /// Synchronous accessor for the session's model-readiness gate.
+    var currentModelLoadState: ModelLoadState { loadStateSubject.value }
+
     /// User-curated terms that bias decoding toward proper nouns and jargon.
     /// M8 will wire `Settings.customDictionaryTerms` → `setCustomDictionaryTerms`.
     /// Until then, the list is empty; the special-token filter still runs and
@@ -41,6 +74,17 @@ final class TranscriptionManager {
 
     init(modelName: String = Constants.defaultModel) {
         self.modelName = modelName
+        // Synchronous disk check: if the model files are already on disk the user
+        // will see "Loading…" (warm launch); otherwise "Downloading model…" (cold).
+        let downloadBase = Self.modelDownloadBase()
+        let isCached = Self.isModelCached(downloadBase: downloadBase, modelName: modelName)
+        loadStateSubject = CurrentValueSubject(isCached ? .loading : .downloading)
+    }
+
+    // internal for testability — drives the load state without touching the real
+    // model, so session tests can exercise the model-readiness gate.
+    func setModelLoadStateForTesting(_ state: ModelLoadState) {
+        loadStateSubject.send(state)
     }
 
     // internal for testability — the model download root. Application Support
@@ -52,9 +96,29 @@ final class TranscriptionManager {
         return appSupport.appendingPathComponent(Constants.modelCacheFolderName, isDirectory: true)
     }
 
+    // internal for testability — checks whether the model's CoreML files are
+    // already on disk. Used at init time to set the correct initial load state
+    // (downloading vs. loading) without an async call. Checks for `AudioEncoder`
+    // which WhisperKit requires before `loadModels()` can proceed.
+    static func isModelCached(downloadBase: URL, modelName: String) -> Bool {
+        // WhisperKit downloads under {base}/models/argmaxinc/whisperkit-coreml/{name}/
+        let dir = downloadBase.appendingPathComponent(
+            "models/argmaxinc/whisperkit-coreml/\(modelName)", isDirectory: true
+        )
+        let fm = FileManager.default
+        return fm.fileExists(atPath: dir.appendingPathComponent("AudioEncoder.mlmodelc").path)
+            || fm.fileExists(atPath: dir.appendingPathComponent("AudioEncoder.mlpackage").path)
+    }
+
     /// Idempotent. AppDelegate kicks this off as fire-and-forget at launch.
     /// Coalesces concurrent callers onto the same `Task` so a second `loadModel`
     /// while the first is in-flight doesn't start a second download.
+    ///
+    /// Emits `ModelLoadState` transitions so the menu bar can show an honest
+    /// "Downloading model…" / "Loading…" status:
+    ///   Cold launch: .downloading → .loading → .ready
+    ///   Warm launch: .loading (already set at init) → .loading → .ready
+    ///   Failure:     .downloading/.loading → .failed
     func loadModel() async throws {
         if whisperKit != nil { return }
         if let loadTask {
@@ -62,29 +126,30 @@ final class TranscriptionManager {
             return
         }
         logger.info("Loading WhisperKit model \(self.modelName, privacy: .public)")
+        let downloadBase = Self.modelDownloadBase()
         let modelName = self.modelName
+        let subject = loadStateSubject  // capture reference; task updates state mid-flight
+
         let task = Task<WhisperKit, Error> {
-            // Download under Application Support, not WhisperKit's default of
-            // ~/Documents/huggingface — Documents is TCC-protected, so the default
-            // triggers a "FreeFlow wants to access Documents" prompt and clutters
-            // the user's Documents (planning 0010).
-            let downloadBase = Self.modelDownloadBase()
+            // Download under Application Support (planning 0010).
             try FileManager.default.createDirectory(at: downloadBase, withIntermediateDirectories: true)
-            // `load: true` is required: without it (and without a `modelFolder`),
-            // WhisperKit's init downloads but does NOT call `loadModels()`, so the
-            // encoder/decoder/tokenizer stay nil until the first `transcribe`
-            // lazy-loads them. That broke two things: the "model loads at launch"
-            // guarantee, and the custom dictionary — `buildPromptTokens` read a nil
-            // `tokenizer` and silently produced an empty prompt.
-            return try await WhisperKit(model: modelName, downloadBase: downloadBase, load: true)
+            // Phase 1: download or find cached model files. `load: false` skips the
+            // in-memory load so we can emit the `.loading` transition before it.
+            let wk = try await WhisperKit(model: modelName, downloadBase: downloadBase, load: false)
+            // Phase 2: files confirmed on disk — now loading CoreML models into memory.
+            subject.send(.loading)
+            try await wk.loadModels()
+            return wk
         }
         loadTask = task
         do {
             let wk = try await task.value
             whisperKit = wk
+            loadStateSubject.send(.ready)
             logger.info("WhisperKit model loaded")
         } catch {
             loadTask = nil
+            loadStateSubject.send(.failed)
             logger.error("WhisperKit load failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
             throw error
         }
