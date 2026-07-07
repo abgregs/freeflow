@@ -282,6 +282,55 @@ struct FocusedTargetClassificationTests {
     }
 }
 
+@Suite("Accessibility probe settle (retry-with-settle policy)")
+struct AccessibilityProbeSettleTests {
+    // The retry-with-settle policy (planning 0012): after `AXIsProcessTrusted()`
+    // reports trusted, the probe is retried up to `maxRetries` extra times with
+    // a settle delay. These tests exercise `probeWithSettle` in isolation —
+    // no OS interaction, `delayNs: 0` so the suite doesn't sleep.
+
+    @MainActor
+    @Test("probe succeeds on first try — exactly one call, no retries needed")
+    func probeSucceedsFirstTry() async {
+        // Happy path: no TCC propagation lag, probe succeeds immediately.
+        var callCount = 0
+        let result = await AccessibilityCapability.probeWithSettle(
+            maxRetries: 2, delayNs: 0, probeAction: { callCount += 1; return true }
+        )
+        #expect(result == true)
+        #expect(callCount == 1)
+    }
+
+    @MainActor
+    @Test("probe fails once then succeeds — settles to true without exhausting retries")
+    func probeFailsOnceThenSucceeds() async {
+        // Encodes the just-granted TCC-propagation case: the first check races
+        // the grant, but the second attempt (after the settle delay) delivers.
+        // Status must end up as .granted, not .denied.
+        var callCount = 0
+        let result = await AccessibilityCapability.probeWithSettle(
+            maxRetries: 2, delayNs: 0, probeAction: { callCount += 1; return callCount >= 2 }
+        )
+        #expect(result == true)
+        #expect(callCount == 2)
+    }
+
+    @MainActor
+    @Test("probe fails all retries — persistent failure returns false (anti-pattern #3 preserved)")
+    func probeFailsAllRetries() async {
+        // Encodes the bundle-misidentification case: a malformed bundle that TCC
+        // accepts but never delivers events. The retry budget must be fully spent
+        // and the result must be false — downgrading to .denied is mandatory to
+        // preserve the honest-status invariant (capabilities.md "no lying").
+        var callCount = 0
+        let result = await AccessibilityCapability.probeWithSettle(
+            maxRetries: 2, delayNs: 0, probeAction: { callCount += 1; return false }
+        )
+        #expect(result == false)
+        #expect(callCount == 3)  // 1 initial + 2 retries
+    }
+}
+
 @Suite("InputMonitoringCapability event decoding")
 struct InputMonitoringDecodeTests {
     // The decode helper is the only CGEvent → TapEvent surface. Tests synthesize
