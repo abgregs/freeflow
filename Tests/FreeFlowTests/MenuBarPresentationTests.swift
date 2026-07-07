@@ -50,13 +50,13 @@ struct MenuBarPresentationTests {
         #expect(visual.statusLabel == "Loading...")
     }
 
-    @Test("failed state shows error icon and 'Ready' label")
+    @Test("failed state shows error icon and an honest failure label")
     func failedState() {
-        // A failed load is treated as an error: the warning glyph appears so the
-        // user knows something is wrong, even if they haven't tried to dictate yet.
+        // "Ready" after a failed load would be the exact menu-bar lie 0004 removes:
+        // dictation cannot work until relaunch, so the label must say so.
         let visual = MenuBarPresentation.visual(state: .idle, hasError: false, modelLoadState: .failed)
         #expect(visual.systemImage == "exclamationmark.triangle")
-        #expect(visual.statusLabel == "Ready")
+        #expect(visual.statusLabel == "Model failed to load")
     }
 
     @Test("load state does not affect recording or processing icons")
