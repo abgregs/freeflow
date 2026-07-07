@@ -111,6 +111,89 @@ struct HotkeyManagerHoldTests {
     }
 }
 
+@Suite("HotkeyManager cancel gesture")
+struct HotkeyManagerCancelTests {
+    // The cancel modifier (planning 0017) is interpreted off the same watched
+    // `.flagsChanged` stream — no mask widening, no keyDown observation, so the
+    // 0006 least-privilege posture is untouched. It fires on the press edge and is
+    // independent of activation mode.
+
+    @MainActor
+    @Test("cancel key press fires onCancel once, on the down edge")
+    func cancelKeyFiresOnPress() {
+        let manager = makeManager(mode: .hold, cancelKeyCode: 63)
+        var cancels = 0
+        manager.onCancel = { cancels += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 63, flags: .maskSecondaryFn))  // press
+        #expect(cancels == 1)
+        manager.handle(.flagsChanged(keyCode: 63, flags: []))                // release: no re-fire
+        #expect(cancels == 1)
+        manager.handle(.flagsChanged(keyCode: 63, flags: .maskSecondaryFn))  // second press
+        #expect(cancels == 2)
+    }
+
+    @MainActor
+    @Test("the cancel key does not disturb activation callbacks")
+    func cancelKeyDoesNotActivate() {
+        let manager = makeManager(mode: .hold, cancelKeyCode: 63)
+        var activates = 0
+        var deactivates = 0
+        var cancels = 0
+        manager.onActivate = { activates += 1 }
+        manager.onDeactivate = { deactivates += 1 }
+        manager.onCancel = { cancels += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 63, flags: .maskSecondaryFn))  // cancel press
+        manager.handle(.flagsChanged(keyCode: 63, flags: []))                // cancel release
+        #expect(cancels == 1)
+        #expect(activates == 0)   // activation latch untouched
+        #expect(deactivates == 0)
+
+        // The watched key still starts a recording normally afterward.
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))
+        #expect(activates == 1)
+    }
+
+    @MainActor
+    @Test("cancel is disabled when it would collide with the activation key")
+    func cancelDisabledWhenEqualsActivationKey() {
+        // If the cancel keycode equals the watched key, that key already means
+        // start/stop; the gesture disables so it isn't ambiguous. Watched == cancel
+        // == 62 → the event drives activation (Hold), never onCancel.
+        let manager = makeManager(mode: .hold, cancelKeyCode: 62)
+        var activates = 0
+        var cancels = 0
+        manager.onActivate = { activates += 1 }
+        manager.onCancel = { cancels += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))
+        #expect(cancels == 0)
+        #expect(activates == 1)   // treated as an activation, not a cancel
+    }
+
+    @MainActor
+    @Test("cancel works identically in a tap mode")
+    func cancelWorksInTapMode() {
+        let manager = makeManager(mode: .singleTap, cancelKeyCode: 63)
+        var cancels = 0
+        manager.onCancel = { cancels += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 63, flags: .maskSecondaryFn))
+        #expect(cancels == 1)
+    }
+
+    @MainActor
+    private func makeManager(mode: ActivationMode, cancelKeyCode: Int) -> HotkeyManager {
+        HotkeyManager(
+            inputMonitoring: InputMonitoringCapability(),
+            initialKeyCode: 62,
+            initialMode: mode,
+            cancelKeyCode: cancelKeyCode
+        )
+    }
+}
+
 @Suite("HotkeyManager tap modes")
 struct HotkeyManagerTapTests {
     // Tap modes act only on the completing (key-up) edge of a tap and route

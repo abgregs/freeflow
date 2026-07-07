@@ -86,6 +86,20 @@ final class AudioCaptureManager {
         return trimmed
     }
 
+    /// Discards an in-flight recording (planning 0017): tears down the buffer
+    /// subscription, stops the engine, and drops every captured buffer WITHOUT
+    /// converting, trimming, or returning them. The cancel-path counterpart to
+    /// `stopRecording` — there is no audio to transcribe or paste, so it neither
+    /// waits for warmup nor throws `.noAudioCaptured` (an empty buffer list is the
+    /// expected outcome, not a failure). Safe to call when nothing is recording.
+    func discardRecording() async {
+        cancellables.removeAll()
+        microphone.stopEngine()
+        let dropped = buffers.count
+        buffers.removeAll(keepingCapacity: true)
+        logger.info("discardRecording: dropped \(dropped, privacy: .public) buffers; no transcription")
+    }
+
     // internal for testability — pure conversion from N hardware-format buffers
     // to a single 16 kHz mono Float32 sample array. Done once at stop time
     // rather than inside the tap callback (free-flow-pipeline.md step 3).

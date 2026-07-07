@@ -110,6 +110,7 @@ final class FreeFlowSession {
         hotkey.onDeactivate = { [weak self] in
             Task { @MainActor in await self?.handleDeactivate() }
         }
+        hotkey.onCancel = { [weak self] in self?.handleCancel() }
     }
 
     // internal for testability — state-guarded `.idle` → `.recording` transition.
@@ -182,6 +183,32 @@ final class FreeFlowSession {
         }
         stateSubject.send(.idle)
         logger.info("State -> idle")
+        applyPendingReconfigurations()
+        applyPendingModelSwitch()
+    }
+
+    // internal for testability — the discard transition (planning 0017):
+    // `.recording → .idle` with NO transcription and NO paste. Guarded to
+    // `.recording`, mirroring the re-entrancy posture of `handleActivate` /
+    // `handleDeactivate`, so cancel while `.idle` or `.processing` is a logged
+    // no-op (cancel during `.processing` is out of scope — the paste is imminent).
+    // The audio buffers are discarded (never converted); a `notices` message makes
+    // the cancel visible. Crucially it runs the SAME deferral loop as the normal
+    // cycle end, so a key/mode/model change parked during the canceled recording
+    // still applies on the return to `.idle` (AC3). The notice is sent AFTER the
+    // `.idle` transition: `AppState` clears recording-context notices on leaving
+    // `.recording`, so emitting first would immediately wipe it.
+    func handleCancel() {
+        guard currentState == .recording else {
+            logger.info("Ignoring cancel in state \(String(describing: self.currentState), privacy: .public)")
+            return
+        }
+        logger.info("Cancel: discarding in-flight recording (no transcription, no paste)")
+        let audio = self.audio
+        Task { @MainActor in await audio.discardRecording() }
+        stateSubject.send(.idle)
+        logger.info("State -> idle (canceled)")
+        noticeSubject.send(ActivationNotice.recordingCanceled)
         applyPendingReconfigurations()
         applyPendingModelSwitch()
     }

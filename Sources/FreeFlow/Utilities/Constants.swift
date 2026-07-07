@@ -22,6 +22,21 @@ enum Constants {
     // are the only ones reliable on Caps Lock). See requirements/activation-key-and-mode.md.
     static let defaultActivationMode: ActivationMode = .hold
 
+    // Cancel gesture (planning 0017). Tapping this modifier key while recording
+    // discards the in-flight recording — no transcription, no paste. It MUST be a
+    // *modifier* keycode, because the event tap observes `.flagsChanged` only and
+    // never `keyDown` (the 0006 least-privilege posture — see
+    // planning/0006_runtime-security-hardening.md); Escape (a keyDown) is therefore
+    // off-limits without widening the tap. fn/Globe (63) is universal on Apple
+    // keyboards, is rarely chorded during dictation (unlike Command/Control/Shift,
+    // which would false-cancel on every shortcut), and is distinct from the default
+    // activation key. The menu-bar "Cancel Recording" item is the always-available
+    // discoverable fallback. Internal tunable, not a user setting (load-bearing rule
+    // #5). If it ever equals the watched activation key the gesture disables itself
+    // (the menu item still works). Verify fn delivers a `.flagsChanged` with keycode
+    // 63 on-device — the Globe key is special-cased on some keyboards.
+    static let cancelKeyCode: Int = 63
+
     // Double-tap detection window. Two complete taps within this many milliseconds
     // start a recording. Deliberately an internal tunable, NOT a user setting:
     // exposing a slider is friction for a value the user shouldn't have to reason
