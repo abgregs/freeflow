@@ -132,18 +132,31 @@ final class FreeFlowSession {
         do {
             let samples = try await audio.stopRecording()
             logger.info("Captured \(samples.count, privacy: .public) samples")
-            do {
-                let text = try await transcription.transcribe(audioSamples: samples)
-                logger.info("Transcribed \(text.count, privacy: .public) chars")
+            if samples.isEmpty {
+                // Buffers arrived but the silence trim removed everything: an
+                // all-silence recording (a stray key-brush, an accidental tap). The
+                // user said nothing — NOT a failure. Drop silently: don't decode
+                // (Whisper hallucinates text from silence), don't paste, don't raise
+                // the error glyph. The `notices` channel clears on recording-end
+                // (AppState) so a post-recording message wouldn't survive there, and
+                // a stray brush shouldn't nag; logged for observability (planning
+                // 0023). A recording that DID contain speech but decoded empty still
+                // throws `.emptyTranscription` below and surfaces loudly.
+                logger.info("Recording was all silence after trim; skipping decode")
+            } else {
                 do {
-                    try await textInsertion.insertText(text)
+                    let text = try await transcription.transcribe(audioSamples: samples)
+                    logger.info("Transcribed \(text.count, privacy: .public) chars")
+                    do {
+                        try await textInsertion.insertText(text)
+                    } catch {
+                        logger.error("Text insertion failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
+                        errorSubject.send(.textInsertion(underlying: error))
+                    }
                 } catch {
-                    logger.error("Text insertion failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
-                    errorSubject.send(.textInsertion(underlying: error))
+                    logger.error("Transcription failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
+                    errorSubject.send(.transcription(underlying: error))
                 }
-            } catch {
-                logger.error("Transcription failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
-                errorSubject.send(.transcription(underlying: error))
             }
         } catch {
             logger.error("Audio capture failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
