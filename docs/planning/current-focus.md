@@ -48,6 +48,8 @@ The project status log and the maintainer's queue; kept current by the maintaine
 
 **The V1 sprint (M1–M11) is complete as of `v0.1.0`** (see the top of this log). Next work is the post-V1 backlog tracked in [_index.md](_index.md).
 
+**UX review captured as backlog specs** (2026-07-06). A UI/UX review of the shipped app identified the highest-impact improvements and landed them as specs 0016–0021 (sound cues, cancel recording, transient error toasts, last-transcript recovery, mic level meter, model picker), joining the already-queued 0002/0003/0004/0012. The review's headline: the app is heavily instrumented for correctness but sparse on user feedback — the first-run model-load window ([0004](0004_model-loading-indicator.md), which can silently lose audio) and the recording HUD ([0002](0002_recording-indicator-hud.md)) are the top two. See the new **Groupings** section in [_index.md](_index.md) for which items share the `AppState` seam and could land as one PR (0002 + 0018 + 0020), and the ordering dependency 0004 → 0021.
+
 **Also queued: Recording indicator HUD** ([0002_recording-indicator-hud.md](0002_recording-indicator-hud.md)). A floating, fixed-position, non-activating "recording…" toast that observes the same `FreeFlowState` seam — mode-agnostic (identical for Hold / tap modes), deferred but captured. Depends on the menu-bar milestone's state seam (landed). Surface the applicable conventions from `docs/` before starting.
 
 ## Working agreement

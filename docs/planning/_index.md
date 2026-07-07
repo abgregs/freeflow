@@ -26,8 +26,22 @@ Planning lives in three layers:
 - [0013_release-automation.md](0013_release-automation.md) — automate the last manual release steps: publish the `CHANGELOG.md` section as the GitHub Release notes and auto-bump the Homebrew tap's cask on each tag (via a scoped cross-repo token). The tap repo stays — Homebrew mandates the `homebrew-` prefix and clones the whole tap per user — but becomes a generated artifact. Combines the changelog wiring and the deferred cask-bump automation.
 - [0014_test-coverage-and-ci.md](0014_test-coverage-and-ci.md) — harden the test surface from a testing-focused review (the suite is strong, not theater): run the 99-test suite in CI as a required check (today nothing runs `swift test` on PRs), then close four content gaps it leaves open — the transcription empty-prompt retry fallback, the `AppState` session→UI wiring, `AudioCaptureManager.convert` error/content paths, and a few minor branches. No new product behavior.
 - [0015_automated-doc-sync.md](0015_automated-doc-sync.md) — **landed 2026-07-03**: retire the project-scoped `brief`/`debrief` skills (their metadata is injected into every Claude Code session — a harness-specific workflow imposed on contributors, and doc upkeep pushed onto them) and make the contributor guidance harness-neutral; doc/code drift moves to a scheduled maintainer routine that reviews new commits, applies high-confidence doc updates behind an adversarial review pass, and opens a PR with ambiguous findings flagged for the maintainer.
+- [0016_recording-sound-cues.md](0016_recording-sound-cues.md) — audible begin/end cues for recording behind a `playFeedbackSounds` setting; the audio sibling of the HUD, another observer of the state seam. From the 2026-07-06 UX review.
+- [0017_cancel-recording.md](0017_cancel-recording.md) — an escape hatch to discard an in-flight recording (`.recording → .idle`, no transcription, no paste); the trigger choice must respect the 0006 `.listenOnly`/`.flagsChanged`-only privacy posture. From the 2026-07-06 UX review.
+- [0018_transient-error-toasts.md](0018_transient-error-toasts.md) — graduate cycle errors into a transient, actionable toast on the recording HUD (the richer error surface 0002 reserves); menu row stays as the lingering record. Depends on 0002. From the 2026-07-06 UX review.
+- [0019_last-transcript-recovery.md](0019_last-transcript-recovery.md) — keep the last transcription in memory and add a "Copy Last Transcription" menu item, so a failed or misdirected paste doesn't force re-dictating; memory-only, never logged. From the 2026-07-06 UX review.
+- [0020_mic-level-meter.md](0020_mic-level-meter.md) — live input-level indicator in the HUD so silent-mic capture is visible *during* recording instead of a post-hoc "returned no text"; level computed inside `MicrophoneCapability`. Depends on 0002. From the 2026-07-06 UX review.
+- [0021_model-picker.md](0021_model-picker.md) — promote the model-picker open item to a spec: `Settings.selectedModel` + curated `Constants` list + off-cycle WhisperKit reload. Depends on 0004 (a switch re-enters the load window). From the 2026-07-06 UX review.
 
 Detailed specs for individual items live in their own files — a milestone (like [walking-skeleton.md](walking-skeleton.md) for M1) or a backlog item (the `NNNN_` files). The `NNNN_` prefix sorts the backlog roughly by intended order, not a strict queue.
+
+## Groupings — items that could share a PR
+
+Several backlog items compose (surfaced by the 2026-07-06 UX review):
+
+- **The feedback layer** — [0002](0002_recording-indicator-hud.md) (the HUD, the visual anchor), [0004](0004_model-loading-indicator.md), [0016](0016_recording-sound-cues.md), [0018](0018_transient-error-toasts.md), and [0020](0020_mic-level-meter.md) are all additional observers of the same `AppState` seam ([../architecture/app-state-and-menu-bar.md](../architecture/app-state-and-menu-bar.md)) — no architectural change, purely additive renderers. [0018](0018_transient-error-toasts.md) and [0020](0020_mic-level-meter.md) render *inside* the 0002 panel, so those three are natural to land as a single PR; [0004](0004_model-loading-indicator.md) and [0016](0016_recording-sound-cues.md) are independent riders of the same seam and can land separately in any order.
+- **The model pipeline pair** — [0004](0004_model-loading-indicator.md) before [0021](0021_model-picker.md): the picker's model switch re-enters exactly the download/load window 0004 makes visible.
+- **Standalone** — [0012](0012_onboarding-permissions-polish.md), [0017](0017_cancel-recording.md), [0019](0019_last-transcript-recovery.md), [0003](0003_pause-media-while-dictating.md) have no ordering dependencies among the above.
 
 ## Open items / TODOs
 
@@ -35,6 +49,6 @@ These are tracked here until they're picked up into an active milestone or moved
 
 - **Settings UI for Fn key warning**: parallel to the existing Caps Lock + Hold warning.
 - **Prominent live-reconfiguration notice**: M9 surfaces the "new key now stops the recording" message in the menu dropdown; an always-visible version rides the recording HUD ([0002_recording-indicator-hud.md](0002_recording-indicator-hud.md)).
-- **Model picker in Settings**: a `Constants` model list + off-cycle WhisperKit reload, letting speed-focused users drop back to `base.en`. Deferred through M9; future.
+- **Model picker in Settings**: promoted to [0021_model-picker.md](0021_model-picker.md) (2026-07-06).
 - **Rename `TranscriptionService` → `TranscriptionManager`**: align with the `Manager` suffix convention chosen for cycle collaborators (see [../conventions/swift-style.md](../conventions/swift-style.md)). Standalone PR — touch the type name, file name, and the AppDelegate/session construction sites.
 - **macOS 16 pasteboard privacy**: *moot as of [0011](0011_keystroke-injection.md)* — Apple is rolling out prompts for programmatic pasteboard reads (preview in macOS 15.4; enforcement expected in macOS 16), but Free Flow no longer reads or writes the pasteboard (insertion is keystroke injection), so the prompt can't trigger. Kept for historical context.

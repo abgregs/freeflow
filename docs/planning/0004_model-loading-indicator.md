@@ -60,3 +60,5 @@ is now hit often enough to need a user-visible surface.
 - [../architecture/app-state-and-menu-bar.md](../architecture/app-state-and-menu-bar.md) — the status surface this extends
 - [../requirements/custom-dictionary.md](../requirements/custom-dictionary.md) — why the model (tokenizer) must be loaded before the first prompt
 - [milestones.md](milestones.md) — the roadmap this is queued in
+- [0021_model-picker.md](0021_model-picker.md) — depends on this item: a model switch re-enters exactly the download/load window this makes visible, so this lands first
+- [_index.md](_index.md) — the feedback-layer grouping; this is an independent rider of the same `AppState` seam as [0002](0002_recording-indicator-hud.md)/[0016](0016_recording-sound-cues.md)
