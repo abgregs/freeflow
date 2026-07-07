@@ -55,11 +55,13 @@ final class AudioCaptureManager {
     }
 
     /// Waits up to `warmupWaitSeconds` for the first buffer (so short taps still
-    /// produce audio), then tears down the subscription, stops the engine, and
-    /// converts the accumulated buffers to 16 kHz mono Float32. Throws
-    /// `.noAudioCaptured` if the wait expired with no buffers — the caller
-    /// (FreeFlowSession) surfaces this rather than letting a zero-length
-    /// recording silently succeed.
+    /// produce audio), then tears down the subscription, stops the engine,
+    /// converts the accumulated buffers to 16 kHz mono Float32, and trims leading/
+    /// trailing silence. Throws `.noAudioCaptured` if the wait expired with no
+    /// buffers — the caller (FreeFlowSession) surfaces this rather than letting a
+    /// zero-length recording silently succeed. Returns `[]` when buffers arrived
+    /// but the trim removed everything (an all-silence recording): the caller
+    /// reads that as "nothing was said," not a failure (planning 0023).
     func stopRecording() async throws -> [Float] {
         let deadline = Date().addingTimeInterval(Self.warmupWaitSeconds)
         while buffers.isEmpty && Date() < deadline {
@@ -79,8 +81,9 @@ final class AudioCaptureManager {
         buffers.removeAll(keepingCapacity: true)
 
         let samples = try Self.convert(collected, from: sourceFormat)
-        logger.info("Captured \(samples.count, privacy: .public) samples (16 kHz mono) from \(collected.count, privacy: .public) buffers @ \(sourceFormat.sampleRate, privacy: .public) Hz")
-        return samples
+        let trimmed = Self.trimSilence(samples)
+        logger.info("Captured \(samples.count, privacy: .public) samples (16 kHz mono) from \(collected.count, privacy: .public) buffers @ \(sourceFormat.sampleRate, privacy: .public) Hz; \(trimmed.count, privacy: .public) after silence trim")
+        return trimmed
     }
 
     // internal for testability — pure conversion from N hardware-format buffers
@@ -140,5 +143,42 @@ final class AudioCaptureManager {
         }
 
         return samples
+    }
+
+    // internal for testability — leading/trailing silence trim on the converted
+    // 16 kHz mono buffer. Whisper's worst failure mode is inventing text
+    // ("Thank you for watching.") from silent audio: an accidental activation
+    // captures pure silence, and every real utterance carries trailing breath.
+    // Drop below-`energyThreshold` RMS windows at both ends, keeping `marginSeconds`
+    // of audio around detected speech so onset/offset consonants are never clipped.
+    // All-silence in → [] out, which the session reads as "nothing was said"
+    // (planning 0023). Pure; runs at stop time on the `convert` output.
+    static func trimSilence(
+        _ samples: [Float],
+        sampleRate: Double = 16_000,
+        energyThreshold: Float = Constants.silenceTrimEnergyThreshold,
+        marginSeconds: Double = Constants.silenceTrimMarginSeconds
+    ) -> [Float] {
+        guard !samples.isEmpty else { return [] }
+        let window = max(1, Int(sampleRate * 0.02))  // 20 ms RMS window
+        var firstVoiced: Int?
+        var lastVoiced: Int?
+        var start = 0
+        while start < samples.count {
+            let end = min(start + window, samples.count)
+            var sumSquares: Float = 0
+            for i in start..<end { sumSquares += samples[i] * samples[i] }
+            let rms = (sumSquares / Float(end - start)).squareRoot()
+            if rms >= energyThreshold {
+                if firstVoiced == nil { firstVoiced = start }
+                lastVoiced = end
+            }
+            start += window
+        }
+        guard let first = firstVoiced, let last = lastVoiced else { return [] }
+        let margin = Int(sampleRate * marginSeconds)
+        let lower = max(0, first - margin)
+        let upper = min(samples.count, last + margin)
+        return Array(samples[lower..<upper])
     }
 }

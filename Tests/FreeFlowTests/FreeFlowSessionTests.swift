@@ -186,6 +186,29 @@ struct FreeFlowSessionTests {
     }
 
     @MainActor
+    @Test("an all-silence recording completes the cycle with no error emitted")
+    func allSilenceRecordingEmitsNoError() async throws {
+        // A stray key-brush captures pure silence. `makeBuffer()` is zeros, which
+        // stopRecording's silence trim reduces to empty; the session must skip
+        // decode/paste and NOT raise the error glyph — silence is not a failure.
+        // The `.recording → .processing → .idle` cycle must still complete cleanly
+        // (planning 0023 AC2). Contrast with the no-buffer path, which throws
+        // .noAudioCaptured and DOES surface an error.
+        let env = makeSession()
+        var errors: [FreeFlowError] = []
+        let token = env.session.errors.sink { errors.append($0) }
+        defer { token.cancel() }
+
+        env.session.handleActivate()
+        try await Task.sleep(nanoseconds: 20_000_000)
+        env.microphone.publishForTest(makeBuffer())  // silent zeros → trims to empty
+        await env.session.handleDeactivate()
+
+        #expect(env.session.currentState == .idle)
+        #expect(errors.isEmpty)
+    }
+
+    @MainActor
     @Test("pending reconfiguration applies on return to .idle")
     func pendingReconfigurationAppliesOnReturnToIdle() async throws {
         // The M3 deferral slot closes here: a settings change during a cycle is

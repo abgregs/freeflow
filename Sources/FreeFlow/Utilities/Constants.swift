@@ -46,4 +46,28 @@ enum Constants {
     // chunked because that call is unreliable past ~20 units in some apps. Internal
     // tunable, validated on-device. See planning/0011_keystroke-injection.md.
     static let keystrokeChunkUnits: Int = 20
+
+    // Silence-trim energy gate: a 16 kHz window whose RMS is below this (linear
+    // amplitude, not dBFS) is treated as silence and dropped from the ends of the
+    // recording. Internal tunable, not a setting — the user shouldn't reason about
+    // dBFS (load-bearing rule #5). Tuned against the 0022 silence corpus on-device.
+    static let silenceTrimEnergyThreshold: Float = 0.01
+
+    // Safety margin kept on each side of detected speech so onset/offset consonants
+    // are never clipped by the trim. 100 ms at 16 kHz. See planning/0023.
+    static let silenceTrimMarginSeconds: Double = 0.1
+
+    // Decoding thresholds pinned to upstream Whisper defaults (planning 0023): they
+    // gate silent/near-silent audio to empty output instead of hallucinated text and
+    // drive the temperature fallback for low-confidence segments. WhisperKit 0.18
+    // already defaults to these, but we set them explicitly so the gate can't silently
+    // regress if an upstream default changes. Internal tunables, not settings.
+    static let noSpeechThreshold: Float = 0.6
+    static let logProbThreshold: Float = -1.0
+    static let compressionRatioThreshold: Float = 2.4
+    // Temperature 0 with 5 fallback increments of 0.2 reaches 1.0 — the upstream
+    // Whisper schedule (temperatures 0, 0.2, 0.4, 0.6, 0.8, 1.0).
+    static let decodingTemperature: Float = 0.0
+    static let decodingTemperatureIncrementOnFallback: Float = 0.2
+    static let decodingTemperatureFallbackCount: Int = 5
 }
