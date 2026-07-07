@@ -104,7 +104,7 @@ struct AppStateTests {
             hotkey: hotkey,
             audio: AudioCaptureManager(microphone: microphone),
             textInsertion: TextInsertionManager(accessibility: accessibility),
-            transcription: TranscriptionService(),
+            transcription: TranscriptionManager(),
             settings: store
         )
         let appState = AppState()
