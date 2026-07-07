@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Emit a single-item Sparkle appcast for the release being published (planning
+# 0009). Prints the XML on stdout so the release workflow can write it to a file
+# and attach it to the GitHub Release.
+#
+# A single newest item is enough for Sparkle's "is there something newer?"
+# comparison: it always offers the highest CFBundleVersion in the feed. Each
+# release attaches its own appcast listing itself, and SUFeedURL points at
+# /releases/latest/download/appcast.xml, so an installed copy fetches the newest
+# release's feed. This keeps the pipeline stateless — no need to carry forward
+# every past DMG to rebuild a cumulative feed in CI.
+#
+#   scripts/make-appcast <download-url> <short-version> <build-number> \
+#                        <min-system-version> <signature-attributes>
+#
+# <signature-attributes> is the raw stdout of Sparkle's `sign_update`, e.g.
+#   sparkle:edSignature="BASE64==" length="12345678"
+set -euo pipefail
+
+URL="${1:?usage: make-appcast <download-url> <short-version> <build-number> <min-system-version> <signature-attributes>}"
+SHORT_VERSION="${2:?missing short-version}"
+BUILD="${3:?missing build-number}"
+MIN_SYSTEM="${4:?missing min-system-version}"
+SIGNATURE_ATTRS="${5:?missing signature-attributes (sign_update output)}"
+
+PUB_DATE="$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"
+
+cat <<XML
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Free Flow</title>
+    <link>${URL}</link>
+    <description>Free Flow updates</description>
+    <language>en</language>
+    <item>
+      <title>${SHORT_VERSION}</title>
+      <pubDate>${PUB_DATE}</pubDate>
+      <sparkle:version>${BUILD}</sparkle:version>
+      <sparkle:shortVersionString>${SHORT_VERSION}</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>${MIN_SYSTEM}</sparkle:minimumSystemVersion>
+      <enclosure url="${URL}" type="application/octet-stream" ${SIGNATURE_ATTRS} />
+    </item>
+  </channel>
+</rss>
+XML

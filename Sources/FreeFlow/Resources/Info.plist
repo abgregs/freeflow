@@ -26,5 +26,19 @@
     <string>Free Flow needs microphone access to record your voice for on-device transcription.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <!-- Sparkle auto-update (planning 0009). The appcast is published to each
+         GitHub Release by the release workflow; /releases/latest/download/ always
+         resolves to the newest non-prerelease release's asset, so an installed
+         copy learns about newer versions without a separate host. -->
+    <key>SUFeedURL</key>
+    <string>https://github.com/abgregs/freeflow/releases/latest/download/appcast.xml</string>
+    <!-- Sparkle EdDSA public key. PLACEHOLDER — the MAINTAINER generates the
+         keypair once with Sparkle's `generate_keys`, pastes the printed public
+         key here, and stores the private key as the `SPARKLE_PRIVATE_KEY` CI
+         secret. See docs/architecture/release-pipeline.md. Auto-update stays
+         inert (updates fail signature verification) until this is real. Never
+         commit the private key. -->
+    <key>SUPublicEDKey</key>
+    <string>REPLACE_WITH_SPARKLE_ED_PUBLIC_KEY</string>
 </dict>
 </plist>

@@ -11,7 +11,8 @@ struct FreeFlowApp: App {
                 appState: appDelegate.appState,
                 cancel: { appDelegate.session.handleCancel() },
                 copyLastTranscript: { appDelegate.session.copyLastTranscript() },
-                openPermissions: { appDelegate.onboarding.forcePresent() }
+                openPermissions: { appDelegate.onboarding.forcePresent() },
+                checkForUpdates: { appDelegate.updater.checkForUpdates() }
             )
         } label: {
             MenuBarLabel(appState: appDelegate.appState)
@@ -48,6 +49,10 @@ private struct MenuBarContent: View {
     /// `OnboardingCoordinator.forcePresent()` so users can inspect or refresh
     /// their grants at any time without relaunching.
     let openPermissions: () -> Void
+    /// Triggers a user-initiated Sparkle update check (planning 0009). Wired to
+    /// `UpdaterManager.checkForUpdates()`; automatic background checks run on
+    /// Sparkle's own schedule after the first-launch consent prompt.
+    let checkForUpdates: () -> Void
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -75,6 +80,7 @@ private struct MenuBarContent: View {
         Button("Copy Last Transcription", action: copyLastTranscript)
             .disabled(!appState.hasLastTranscript)
         Divider()
+        Button("Check for Updates…", action: checkForUpdates)
         Button("Permissions…", action: openPermissions)
         Button("Settings…") {
             NSApp.activate(ignoringOtherApps: true)

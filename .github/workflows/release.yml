@@ -134,6 +134,34 @@ jobs:
             --wait
           xcrun stapler staple "$DMG"
 
+      # Sparkle appcast (planning 0009): EdDSA-sign the DMG and write a
+      # single-item appcast so a tag push notifies every Sparkle user without any
+      # manual appcast editing. `sign_update` ships *inside* the Sparkle SwiftPM
+      # artifact, which SPM integrity-checks against the checksum pinned in
+      # `Package.resolved` — so no unpinned third-party action or extra download
+      # is added (0005 workflow hardening). The private key is piped via stdin,
+      # never written to disk or a process argument.
+      - name: Sign the update and build the appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail   # deliberately NO `set -x` — never trace the key
+          if [ -z "${SPARKLE_PRIVATE_KEY:-}" ]; then
+            echo "::error::SPARKLE_PRIVATE_KEY secret is unset — generate the keypair with the Sparkle 'generate_keys' tool and add it (see docs/architecture/release-pipeline.md)."
+            exit 1
+          fi
+          SIGN_UPDATE="$(find .build/artifacts -type f -path '*/bin/sign_update' | head -1)"
+          if [ -z "$SIGN_UPDATE" ]; then
+            echo "::error::sign_update not found in the Sparkle SwiftPM artifact"; exit 1
+          fi
+          SIG_ATTRS="$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" --ed-key-file - "$DMG")"
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/$(basename "$DMG")"
+          MIN_SYSTEM="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Sources/FreeFlow/Resources/Info.plist)"
+          # sparkle:version is CFBundleVersion (the monotonic build number Sparkle
+          # compares) — the same GITHUB_RUN_NUMBER stamped into the plist above.
+          scripts/make-appcast "$DOWNLOAD_URL" "$VERSION_CORE" "$GITHUB_RUN_NUMBER" "$MIN_SYSTEM" "$SIG_ATTRS" > appcast.xml
+          echo "APPCAST=appcast.xml" >> "$GITHUB_ENV"
+
       # Artifact integrity (0005): publish a SHA-256 next to the DMG. Releases
       # are immutable — never re-upload under an existing tag; fix forward.
       - name: Checksum and publish the release
@@ -144,7 +172,9 @@ jobs:
           shasum -a 256 "$DMG" > "$DMG.sha256"
           # A suffixed tag (e.g. v0.0.1-rc1) publishes as a pre-release — the
           # safe way to exercise the pipeline without minting a "real" release.
-          args=( "$GITHUB_REF_NAME" "$DMG" "$DMG.sha256" --title "$GITHUB_REF_NAME" --generate-notes )
+          # The appcast rides along on every release; SUFeedURL points at
+          # /releases/latest/download/appcast.xml, which skips pre-releases.
+          args=( "$GITHUB_REF_NAME" "$DMG" "$DMG.sha256" "$APPCAST" --title "$GITHUB_REF_NAME" --generate-notes )
           if [ "$PRERELEASE" = "true" ]; then args+=( --prerelease ); fi
           gh release create "${args[@]}"
 

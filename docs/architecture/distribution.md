@@ -68,11 +68,11 @@ Versioning rules and the tag-driven protocol are in [../conventions/versioning-a
 
 How an installed copy learns about a newer version differs by channel:
 
-- **GitHub Releases `.dmg`** — no built-in update mechanism today; the user must check the Releases page and re-download. This is the weakest update UX and the motivation for [Sparkle](../planning/0009_sparkle-auto-update.md).
+- **GitHub Releases `.dmg`** — [Sparkle](../planning/0009_sparkle-auto-update.md) provides in-app auto-update. The app embeds a `SPUStandardUpdaterController` (owned by `UpdaterManager`, wired from `AppDelegate`) that reads the `SUFeedURL` appcast the release workflow publishes on each tag; a "Check for Updates…" menu item triggers a manual check. **First launch:** Sparkle shows its built-in "check for updates automatically?" consent prompt before any network request, keeping the app's *second* network behaviour (after the WhisperKit model download) opt-in and transparent — consistent with [../requirements/core-feature.md](../requirements/core-feature.md) item 6. Updates are EdDSA-signed and verified against the embedded `SUPublicEDKey`, independent of Apple notarization.
 - **Homebrew cask** — pull-based: `brew upgrade` (or `brew upgrade --cask freeflow`) picks up new versions on the user's own schedule; Homebrew never notifies proactively. A release only becomes visible to Homebrew once the cask's `version` + `sha256` are bumped in the tap ([packaging/homebrew](../../packaging/homebrew/README.md)).
 - **Source build** — `git pull` + `make install`.
 
-**Planned:** [Sparkle](../planning/0009_sparkle-auto-update.md) adds in-app "Update available" notifications for the DMG channel — the standard mechanism for non-App-Store Mac apps — driven by an appcast the release workflow publishes on each tag.
+The Homebrew cask is marked `auto_updates true` so `brew upgrade` defers to Sparkle instead of fighting it (planning 0009).
 
 ## Related
 
