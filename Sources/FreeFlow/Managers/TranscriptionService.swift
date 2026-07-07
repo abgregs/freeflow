@@ -102,22 +102,36 @@ final class TranscriptionService {
         logger.info("Transcribing \(audioSamples.count, privacy: .public) samples")
 
         let promptTokens = buildPromptTokens(using: whisperKit)
-        var text = try await decode(audioSamples, promptTokens: promptTokens, using: whisperKit)
+        let text = try await resolveWithEmptyPromptRetry(promptTokens: promptTokens) { tokens in
+            try await self.decode(audioSamples, promptTokens: tokens, using: whisperKit)
+        }
+        logger.info("Transcribed \(text.count, privacy: .public) chars")
+        return text
+    }
 
-        // A custom-dictionary prompt must only ever *help*. A small model like
-        // `base.en` can occasionally emit empty output when conditioned on a
-        // prompt; without this, adding a dictionary term could turn a working
-        // dictation into a hard `.emptyTranscription` error — strictly worse than
-        // no dictionary. Retry unprompted so the dictionary degrades to neutral.
-        // A genuinely silent recording still errors honestly (the retry is also
-        // empty). Logged so prompt-quality regressions stay observable.
+    // internal for testability — the "a custom-dictionary prompt must only ever
+    // *help*" retry rule, lifted out of `transcribe` as a narrow decode seam so
+    // it runs without a live model. This is ADR 0001's named-but-unpromoted seam,
+    // NOT a `Transcriber` protocol: the caller injects a `decode` closure (the
+    // real WhisperKit call in production, a canned string in tests).
+    //
+    // A small model like `base.en` can occasionally emit empty output when
+    // conditioned on a prompt; without the retry, adding a dictionary term could
+    // turn a working dictation into a hard `.emptyTranscription` — strictly worse
+    // than no dictionary (requirements/custom-dictionary.md). Retry unprompted so
+    // the dictionary degrades to neutral. A genuinely silent recording still
+    // errors honestly (the retry is also empty). Logged so prompt-quality
+    // regressions stay observable.
+    func resolveWithEmptyPromptRetry(
+        promptTokens: [Int],
+        decode: (_ promptTokens: [Int]) async throws -> String
+    ) async throws -> String {
+        var text = try await decode(promptTokens)
         if text.isEmpty, !promptTokens.isEmpty {
             logger.warning("Prompted transcription was empty; retrying without the custom-dictionary prompt")
-            text = try await decode(audioSamples, promptTokens: [], using: whisperKit)
+            text = try await decode([])
         }
-
         guard !text.isEmpty else { throw TranscriptionError.emptyTranscription }
-        logger.info("Transcribed \(text.count, privacy: .public) chars")
         return text
     }
 
