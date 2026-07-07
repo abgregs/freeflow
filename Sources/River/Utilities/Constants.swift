@@ -101,4 +101,28 @@ enum Constants {
     static let decodingTemperature: Float = 0.0
     static let decodingTemperatureIncrementOnFallback: Float = 0.2
     static let decodingTemperatureFallbackCount: Int = 5
+
+    // Recording-indicator HUD (planning 0002/0018/0020). These are internal
+    // tunables, NOT settings: the HUD has no user-facing configuration (load-bearing
+    // rule #5), so its timing, layout, and thresholds live here.
+
+    // Fade in/out duration for the HUD panel. The panel is ordered out only after
+    // this outlives the return to `.idle`, so the fade animation completes on screen
+    // before the window is removed (planning 0002 acceptance criterion 2).
+    static let hudFadeSeconds: Double = 0.22
+    // Gap between the HUD panel and the bottom of the active screen's visible frame.
+    static let hudBottomMargin: Double = 120
+
+    // How long an error toast stays on the HUD before auto-dismissing (planning
+    // 0018 acceptance criterion 1). Long enough to read a headline + hint, short
+    // enough to "get out of the way."
+    static let errorToastDurationSeconds: Double = 4.0
+
+    // Mic level meter (planning 0020). Bars in the meter; the publish interval
+    // throttles the level publisher to ~14 Hz (plenty for a meter, far below the
+    // ~43 buffers/sec the tap delivers); the reference RMS is the linear amplitude
+    // mapped to a full-scale meter (a ~0.2 RMS speech peak lights every bar).
+    static let levelMeterBarCount: Int = 12
+    static let levelMeterPublishInterval: Double = 0.07
+    static let levelMeterReferenceRMS: Float = 0.2
 }
