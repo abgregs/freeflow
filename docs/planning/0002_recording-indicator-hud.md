@@ -29,7 +29,7 @@ A queued roadmap item — **deferred but captured**. A floating, fixed-position,
 
 ## Relationship to the error surface
 
-The Menu-bar visual state milestone ships a minimal, path-redacted error *row* in the menu (a persistent, glanceable record). This panel is the natural home for a richer, transient **error toast** ("Paste failed — check Accessibility") — a *second* renderer of the same redacted error. Menu row = lingering record; toast = momentary alert (not duplication, different roles). Any error text shown here passes through `LogRedaction.redactUserPaths` ([ADR 0002](../decisions/0002-log-redaction-over-debug-flag.md)).
+The Menu-bar visual state milestone ships a minimal, path-redacted error *row* in the menu (a persistent, glanceable record). This panel is the natural home for a richer, transient **error toast** ("Paste failed — check Accessibility") — a *second* renderer of the same redacted error. Menu row = lingering record; toast = momentary alert (not duplication, different roles). Any error text shown here passes through `LogRedaction.redactUserPaths` ([ADR 0002](../decisions/0002-log-redaction-over-debug-flag.md)). The toast is now spec'd as [0018_transient-error-toasts.md](0018_transient-error-toasts.md), and a mic level meter riding the same panel as [0020_mic-level-meter.md](0020_mic-level-meter.md) — both depend on this item and could land in the same PR (see the feedback-layer grouping in [_index.md](_index.md)).
 
 ## Acceptance criteria
 
@@ -51,7 +51,7 @@ The Menu-bar visual state milestone ships a minimal, path-redacted error *row* i
 - Exact placement and multi-display handling (active screen vs. main).
 - Processing visual (morph dots → spinner vs. swap label).
 - Fade timing, and whether a minimum on-screen duration prevents flicker on very short taps.
-- Whether to graduate the error toast into this panel in this milestone or a later pass.
+- Whether to graduate the error toast ([0018](0018_transient-error-toasts.md)) and the level meter ([0020](0020_mic-level-meter.md)) into this panel in the same PR or a later pass.
 
 ## Related
 
@@ -60,3 +60,5 @@ The Menu-bar visual state milestone ships a minimal, path-redacted error *row* i
 - [../architecture/free-flow-pipeline.md](../architecture/free-flow-pipeline.md) — the state machine this observes; the error surface
 - [../architecture/capabilities.md](../architecture/capabilities.md) — `OnboardingCoordinator`, the window-owning-coordinator pattern this mirrors
 - [0001_focused-element-paste-guard.md](0001_focused-element-paste-guard.md) — shares the "don't disturb the focused field" theme and the error-surface reuse
+- [0018_transient-error-toasts.md](0018_transient-error-toasts.md) / [0020_mic-level-meter.md](0020_mic-level-meter.md) — render inside this panel (depend on this item)
+- [0016_recording-sound-cues.md](0016_recording-sound-cues.md) — the audio sibling: same state seam, independent surface

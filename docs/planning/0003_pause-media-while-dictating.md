@@ -15,6 +15,8 @@ The hard part is doing this **idempotently** — pause on record-start, resume o
 
 `MediaPauseManager` owns whichever APIs are chosen (mirrors the capability "one owner per OS surface" shape). `FreeFlowSession` calls `pauseIfPlaying()` on entry to `.recording` and `resumeIfPaused()` on the return to `.idle`, gated by the setting — but only resumes what it paused (track that state in the manager).
 
+Because the candidate API is private, it can break under an OS update. If it does, the manager must **degrade loudly** — log the failure and surface that the feature is inoperative (or disable the toggle) — never leave a live toggle silently doing nothing, per the no-silent-no-op rule the deferral itself was about.
+
 ## Acceptance criteria
 
 1. Toggle on + media playing → recording pauses it; cycle end resumes it.
