@@ -2,6 +2,8 @@
 
 A queued backlog item from the 2026-07-06 UX review. Keep the most recent transcription in memory and add a menu-bar **"Copy Last Transcription"** item, so a failed or misdirected paste doesn't force the user to re-dictate everything.
 
+> **Amended by [0025](0025_streaming-dictation.md) (2026-07-11):** under streaming dictation, "the last transcription" is the *accumulated session transcript* (every segment inserted this session), not the final segment. Retention semantics here are unchanged for the one-shot mode.
+
 ## Problem
 
 When the paste fails — no editable target ([0001](0001_focused-element-paste-guard.md)'s guard), the silent-no-op probe firing, a post error — or simply lands in the wrong field, the transcription is **gone**. The error row explains *why* it failed but cannot give the text back; the user's only recovery is to dictate the whole thing again. For long dictations this is the single most expensive failure in the app, and it's exactly the moment the user is already frustrated.
