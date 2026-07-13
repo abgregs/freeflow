@@ -2,6 +2,8 @@
 
 A queued backlog item from the 2026-07-06 UX review. Give the user a way to discard an in-flight recording — today the state machine has no discard path, so every recording runs to transcription and paste.
 
+> **Amended by [0025](0025_streaming-dictation.md) (2026-07-11):** under streaming dictation, "no transcription, no paste" cannot hold once segments have already been inserted — cancel becomes *discard the un-pasted tail*; already-inserted text stays. This spec's semantics are unchanged for the one-shot mode.
+
 ## Problem
 
 Once `.recording`, the cycle always proceeds: `.recording → .processing → .idle`, transcribing and pasting whatever was captured. An accidental activation (brushed the hotkey, changed your mind mid-sentence) costs the user a full transcription wait *plus* deleting unwanted text out of their document. There is no escape hatch — a dead-end state the UX review flagged.
