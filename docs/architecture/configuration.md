@@ -26,7 +26,7 @@ Settings keys (the target set; declared progressively as their consumers land �
 |---|---|---|---|
 | `activationKeyCode` | `Int` | `Constants.defaultActivationKeyCode` (61, Right Option) | `RiverSession` → `HotkeyManager` |
 | `activationMode` | `ActivationMode` | `Constants.defaultActivationMode` (`.hold`) | `RiverSession` → `HotkeyManager` |
-| `customDictionaryTerms` | `[String]` | `Constants.defaultDictionaryTerms` | *none in V1 — key reserved for the dictionary redesign ([0008](../planning/0008_custom-dictionary-redesign.md))* |
+| `customDictionaryTerms` | `[String]` | `Constants.defaultDictionaryTerms` | *no planned consumer — 0008 redesign dropped 2026-07-06 ([0008](../planning/0008_custom-dictionary-redesign.md)); key and prompt plumbing retained in code* |
 | `selectedModel` | `String` | `Constants.defaultModel` | `TranscriptionService` |
 | `launchAtLogin` | `Bool` | `false` | `SettingsView` → `SMAppService` |
 | `pauseMediaWhileDictating` | `Bool` | `true` | `MediaPauseManager` |
