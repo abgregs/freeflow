@@ -90,6 +90,20 @@ struct SettingsStoreTests {
     }
 
     @MainActor
+    @Test("a stored value that is neither castable nor DefaultsConvertible falls back to the default")
+    func undecodableStoredValueFallsBackToDefault() async throws {
+        // Defensive: if some other process (or a schema change) leaves a value of
+        // the wrong type under a key, `readValue` must return the typed default,
+        // not trap. `activationKeyCode` is an `Int` (not `DefaultsConvertible`), so
+        // a stored `String` is neither directly castable nor decodable — the
+        // last-resort `return key.defaultValue` path.
+        let defaults = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+        defaults.set("not an int", forKey: Settings.activationKeyCode.name)
+        let store = SettingsStore(defaults: defaults)
+        #expect(store.value(for: Settings.activationKeyCode) == Settings.activationKeyCode.defaultValue)
+    }
+
+    @MainActor
     private func makeStore() -> SettingsStore {
         let suite = "test-\(UUID().uuidString)"
         return SettingsStore(defaults: UserDefaults(suiteName: suite)!)

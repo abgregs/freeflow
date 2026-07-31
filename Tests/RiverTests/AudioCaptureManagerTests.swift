@@ -84,6 +84,43 @@ struct AudioCaptureConvertTests {
         #expect(samples.count > 1500)
         #expect(samples.count < 1700)
     }
+
+    @MainActor
+    @Test("convert throws .conversionFailed when no converter can be built for the source format")
+    func convertThrowsWhenConverterUnbuildable() throws {
+        // The `.conversionFailed` guard: a zero-channel source format has no valid
+        // conversion path to 16 kHz mono, so `AVAudioConverter(from:to:)` returns
+        // nil. Buffers are non-empty (so the early empty-return doesn't mask this),
+        // but decoding never starts. Without this branch a converter failure would
+        // surface as a crash or a silent empty result instead of `.noAudioCaptured`'s
+        // sibling error the session can report.
+        let badFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32, sampleRate: 44_100, channels: 0, interleaved: false
+        )!
+        #expect(throws: AudioCaptureError.self) {
+            _ = try AudioCaptureManager.convert([makeBuffer(milliseconds: 100)], from: badFormat)
+        }
+    }
+
+    @MainActor
+    @Test("convert preserves signal energy, not just length, for a non-silent input")
+    func convertPreservesSignalEnergy() throws {
+        // The length tests feed silent zero buffers, so a converter that emitted
+        // zeros of the right length would pass them. Feed a real 440 Hz sine and
+        // assert the 16 kHz output carries energy (RMS well above zero) — proof the
+        // samples are actually resampled, not blanked. Energy/shape, not sample
+        // equality: AVAudioConverter latency makes exact-match brittle.
+        let format = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32, sampleRate: 44_100, channels: 1, interleaved: false
+        )!
+        let samples = try AudioCaptureManager.convert(
+            [makeSineBuffer(milliseconds: 100, frequency: 440, amplitude: 0.5)], from: format
+        )
+        #expect(samples.count > 1500)   // same resampler-latency window as the silent case
+        #expect(samples.count < 1700)
+        let rms = (samples.reduce(Float(0)) { $0 + $1 * $1 } / Float(samples.count)).squareRoot()
+        #expect(rms > 0.1)              // a 0.5-amplitude sine is ~0.35 RMS; zeros would be 0
+    }
 }
 
 // Synthesize a silent 44.1 kHz mono Float32 buffer of the requested duration.
@@ -96,5 +133,21 @@ private func makeBuffer(milliseconds: Int, sampleRate: Double = 44_100) -> AVAud
     let frames = AVAudioFrameCount(Double(milliseconds) * sampleRate / 1000.0)
     let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
     buffer.frameLength = frames
+    return buffer
+}
+
+// Synthesize a non-silent 44.1 kHz mono Float32 buffer holding a pure sine, so a
+// conversion test can assert the output carries real energy (not zeros of the
+// right length). Amplitude and frequency are fixed by the caller for a known RMS.
+@MainActor
+private func makeSineBuffer(
+    milliseconds: Int, frequency: Double, amplitude: Float, sampleRate: Double = 44_100
+) -> AVAudioPCMBuffer {
+    let buffer = makeBuffer(milliseconds: milliseconds, sampleRate: sampleRate)
+    let frames = Int(buffer.frameLength)
+    let channel = buffer.floatChannelData![0]
+    for i in 0..<frames {
+        channel[i] = amplitude * Float(sin(2.0 * .pi * frequency * Double(i) / sampleRate))
+    }
     return buffer
 }
