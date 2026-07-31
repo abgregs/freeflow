@@ -35,6 +35,58 @@ struct TranscriptionCacheLocationTests {
     }
 }
 
+@Suite("TranscriptionService empty-prompt retry")
+struct TranscriptionEmptyPromptRetryTests {
+    // The dictionary-can-only-help guarantee (custom-dictionary.md): a prompted
+    // decode that comes back empty must retry unprompted, so adding a dictionary
+    // term never turns a working dictation into a hard `.emptyTranscription`.
+    // Exercised through the narrow decode seam (ADR 0001) — a fake `decode`
+    // closure, no live WhisperKit model.
+
+    @MainActor
+    @Test("prompted-empty falls back to the unprompted retry and returns its text")
+    func promptedEmptyRetriesUnprompted() async throws {
+        // Prompted decode degenerates to empty; unprompted yields text. The retry
+        // must fire and its text — not an error — is what the user gets.
+        let service = TranscriptionService()
+        var calls: [[Int]] = []
+        let text = try await service.resolveWithEmptyPromptRetry(promptTokens: [1, 2, 3]) { tokens in
+            calls.append(tokens)
+            return tokens.isEmpty ? "hello" : ""
+        }
+        #expect(text == "hello")
+        #expect(calls == [[1, 2, 3], []])   // prompted first, then the unprompted retry
+    }
+
+    @MainActor
+    @Test("a genuinely silent recording (both decodes empty) still throws .emptyTranscription")
+    func bothEmptyThrows() async {
+        // The retry degrades a bad prompt to neutral, not error — but honest
+        // failure must survive: if the audio itself is silent, both decodes are
+        // empty and the cycle must still surface `.emptyTranscription`.
+        let service = TranscriptionService()
+        await #expect(throws: TranscriptionError.self) {
+            _ = try await service.resolveWithEmptyPromptRetry(promptTokens: [1, 2, 3]) { _ in "" }
+        }
+    }
+
+    @MainActor
+    @Test("no prompt: an empty decode throws without a spurious retry")
+    func noPromptEmptyThrowsWithoutRetry() async {
+        // With no prompt in play there is nothing to degrade to, so an empty
+        // decode is an honest empty result — it must not trigger a second call.
+        let service = TranscriptionService()
+        var callCount = 0
+        await #expect(throws: TranscriptionError.self) {
+            _ = try await service.resolveWithEmptyPromptRetry(promptTokens: []) { _ in
+                callCount += 1
+                return ""
+            }
+        }
+        #expect(callCount == 1)   // no retry when there was no prompt to blame
+    }
+}
+
 @Suite("TranscriptionService prompt-token filter")
 struct TranscriptionFilterTests {
     // The custom-dictionary prompt feeds raw token IDs into WhisperKit's
