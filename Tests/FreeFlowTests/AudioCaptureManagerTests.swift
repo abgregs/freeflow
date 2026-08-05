@@ -10,11 +10,13 @@ struct AudioCaptureCycleTests {
     @Test("stopRecording returns 16 kHz samples when a buffer was published")
     func stopRecordingReturnsSamples() async throws {
         // Happy path: a single 100 ms buffer at 44.1 kHz → ~1600 samples at 16 kHz.
+        // A *voiced* buffer — stopRecording now trims silence, so a zero buffer
+        // would trim to empty (see AudioCaptureSilenceTrimTests).
         let microphone = MicrophoneCapability()
         microphone.skipEngineForTesting = true
         let manager = AudioCaptureManager(microphone: microphone)
         await manager.startRecording()
-        microphone.publishForTest(makeBuffer(milliseconds: 100))
+        microphone.publishForTest(makeSineBuffer(milliseconds: 100, frequency: 440, amplitude: 0.5))
         let samples = try await manager.stopRecording()
         #expect(samples.count > 1500)
         #expect(samples.count < 1700)
@@ -52,10 +54,11 @@ struct AudioCaptureCycleTests {
             try await manager.stopRecording()
         }
         try await Task.sleep(nanoseconds: 100_000_000)
-        microphone.publishForTest(makeBuffer(milliseconds: 50))
+        // Voiced buffer: stopRecording trims silence, so zeros would trim to empty.
+        microphone.publishForTest(makeSineBuffer(milliseconds: 50, frequency: 440, amplitude: 0.5))
 
         let samples = try await stopTask.value
-        #expect(samples.count > 700)  // ~50 ms at 16 kHz ≈ 800 samples
+        #expect(samples.count > 700)  // ~50 ms at 16 kHz ≈ 800 samples (margin keeps all)
         #expect(samples.count < 900)
     }
 }
@@ -121,6 +124,66 @@ struct AudioCaptureConvertTests {
         let rms = (samples.reduce(Float(0)) { $0 + $1 * $1 } / Float(samples.count)).squareRoot()
         #expect(rms > 0.1)              // a 0.5-amplitude sine is ~0.35 RMS; zeros would be 0
     }
+}
+
+@Suite("AudioCaptureManager silence trim")
+struct AudioCaptureSilenceTrimTests {
+    // Whisper hallucinates text from silence — pasting words the user never spoke
+    // is this app's worst failure. `trimSilence` drops below-threshold audio at
+    // both ends of the 16 kHz buffer, keeping a margin so speech is never clipped.
+    // Same synthetic-input pattern as the convert tests. See planning 0023.
+
+    @MainActor
+    @Test("all-silence input trims to empty")
+    func allSilenceTrimsToEmpty() {
+        // An accidental activation captures pure silence. It must trim to empty so
+        // the session skips decode entirely — no hallucinated paste.
+        let silence = [Float](repeating: 0, count: 16_000)  // 1 s of digital silence
+        #expect(AudioCaptureManager.trimSilence(silence).isEmpty)
+    }
+
+    @MainActor
+    @Test("empty input trims to empty")
+    func emptyTrimsToEmpty() {
+        #expect(AudioCaptureManager.trimSilence([]).isEmpty)
+    }
+
+    @MainActor
+    @Test("silence-padded speech keeps the speech with a margin, dropping the padding")
+    func paddedSpeechPreservesSpeech() {
+        // 0.5 s silence, 0.5 s voiced, 0.5 s silence at 16 kHz. The leading/trailing
+        // silence beyond the 100 ms margin must be dropped, but the speech and its
+        // onset/offset margin must survive intact.
+        let pad = [Float](repeating: 0, count: 8_000)
+        let speech = sineSamples(count: 8_000, frequency: 440, amplitude: 0.5)
+        let padded = pad + speech + pad
+
+        let out = AudioCaptureManager.trimSilence(padded)
+
+        #expect(out.count < padded.count)          // padding trimmed
+        #expect(out.count >= speech.count)         // speech + margins survive
+        #expect(out.count < padded.count - 8_000)  // most of one silent side is gone
+        let rms = (out.reduce(Float(0)) { $0 + $1 * $1 } / Float(out.count)).squareRoot()
+        #expect(rms > 0.1)                         // preserved speech carries energy
+    }
+
+    @MainActor
+    @Test("speech-only input is returned untouched")
+    func speechOnlyUntouched() {
+        // No silence to trim: every window is voiced, so the whole buffer survives
+        // (the margin clamps to the array bounds). Length is unchanged.
+        let speech = sineSamples(count: 16_000, frequency: 440, amplitude: 0.5)
+        #expect(AudioCaptureManager.trimSilence(speech).count == speech.count)
+    }
+}
+
+// A 16 kHz mono Float32 sample array holding a pure sine — a synthetic "speech"
+// signal with known energy for the trim tests (mirrors makeSineBuffer, but as a
+// bare sample array since trimSilence operates on the converted buffer).
+private func sineSamples(
+    count: Int, frequency: Double, amplitude: Float, sampleRate: Double = 16_000
+) -> [Float] {
+    (0..<count).map { amplitude * Float(sin(2.0 * .pi * frequency * Double($0) / sampleRate)) }
 }
 
 // Synthesize a silent 44.1 kHz mono Float32 buffer of the requested duration.
