@@ -85,6 +85,88 @@ struct TranscriptionEmptyPromptRetryTests {
         }
         #expect(callCount == 1)   // no retry when there was no prompt to blame
     }
+
+    @MainActor
+    @Test("annotation-only output classifies as .noSpeechDetected, not .emptyTranscription")
+    func annotationOnlyThrowsNoSpeechDetected() async {
+        // Decode gates don't reliably suppress non-speech — probed on-device:
+        // real room tone decodes to "[BLANK_AUDIO]" (planning 0023). That text
+        // must never paste, and it must classify as the quiet no-op case (the
+        // session skips it silently) rather than the loud .emptyTranscription.
+        let service = TranscriptionManager()
+        do {
+            _ = try await service.resolveWithEmptyPromptRetry(promptTokens: []) { _ in "[BLANK_AUDIO]" }
+            Issue.record("expected .noSpeechDetected to be thrown")
+        } catch TranscriptionError.noSpeechDetected {
+            // expected: quiet no-op classification
+        } catch {
+            Issue.record("wrong error: \(error) — the session would show the error glyph")
+        }
+    }
+
+    @MainActor
+    @Test("a prompted annotation-only decode triggers the unprompted retry")
+    func promptedAnnotationRetriesUnprompted() async throws {
+        // Annotation-only is "no speech" for retry purposes too: a prompt that
+        // degenerates decoding to "[BLANK_AUDIO]" must get the same second
+        // chance as one that degenerates to empty — the dictionary can only help.
+        let service = TranscriptionManager()
+        var calls: [[Int]] = []
+        let text = try await service.resolveWithEmptyPromptRetry(promptTokens: [1, 2, 3]) { tokens in
+            calls.append(tokens)
+            return tokens.isEmpty ? "hello" : "[BLANK_AUDIO]"
+        }
+        #expect(text == "hello")
+        #expect(calls == [[1, 2, 3], []])
+    }
+}
+
+@Suite("TranscriptionManager non-speech annotation detector")
+struct TranscriptionAnnotationDetectorTests {
+    // Pure whole-output classifier for Whisper's non-speech labels. The probe
+    // clips (planning 0023) produced exactly these shapes: "[BLANK_AUDIO]"
+    // (quiet room), "[MUSIC]" (keyboard), "(heavy breathing)" (breath). A false
+    // positive here would silently drop real dictation, so the negative cases
+    // matter as much as the positives.
+
+    @MainActor
+    @Test("recognizes the observed annotation forms")
+    func recognizesObservedForms() {
+        #expect(TranscriptionManager.isNonSpeechAnnotation("[BLANK_AUDIO]"))
+        #expect(TranscriptionManager.isNonSpeechAnnotation("(heavy breathing)"))
+        #expect(TranscriptionManager.isNonSpeechAnnotation("[MUSIC]"))
+        #expect(TranscriptionManager.isNonSpeechAnnotation(" [BLANK_AUDIO] "))
+    }
+
+    @MainActor
+    @Test("recognizes multi-segment and punctuation-trailing annotations")
+    func recognizesCompositeForms() {
+        // WhisperKit joins segments with spaces, and models often append a
+        // period — leftover punctuation must not defeat the classification.
+        #expect(TranscriptionManager.isNonSpeechAnnotation("[BLANK_AUDIO] [BLANK_AUDIO]"))
+        #expect(TranscriptionManager.isNonSpeechAnnotation("(sighs)."))
+        #expect(TranscriptionManager.isNonSpeechAnnotation("[MUSIC] (heavy breathing)"))
+    }
+
+    @MainActor
+    @Test("never classifies output containing real words")
+    func neverEatsRealSpeech() {
+        // Mixed annotation+speech keeps the speech — whole-output check only.
+        #expect(!TranscriptionManager.isNonSpeechAnnotation("Hello world"))
+        #expect(!TranscriptionManager.isNonSpeechAnnotation("Hello (laughs) world"))
+        #expect(!TranscriptionManager.isNonSpeechAnnotation("[MUSIC] turn it up"))
+    }
+
+    @MainActor
+    @Test("empty and annotation-free punctuation are NOT annotations")
+    func emptyAndBarePunctuationAreNot() {
+        // Empty is `.emptyTranscription`'s territory, and punctuation-only output
+        // with no bracketed label present is left alone — classification requires
+        // at least one annotation to have matched.
+        #expect(!TranscriptionManager.isNonSpeechAnnotation(""))
+        #expect(!TranscriptionManager.isNonSpeechAnnotation("   "))
+        #expect(!TranscriptionManager.isNonSpeechAnnotation("..."))
+    }
 }
 
 @Suite("TranscriptionManager prompt-token filter")
