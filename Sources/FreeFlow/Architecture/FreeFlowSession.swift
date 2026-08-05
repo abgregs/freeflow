@@ -153,6 +153,14 @@ final class FreeFlowSession {
                         logger.error("Text insertion failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
                         errorSubject.send(.textInsertion(underlying: error))
                     }
+                } catch TranscriptionError.noSpeechDetected {
+                    // Decode heard only non-speech (breath, room tone, music the
+                    // trim didn't catch): same policy as the all-silence branch
+                    // above — nothing was said, so no paste and no error glyph
+                    // (planning 0023). When the 0002/0018/0020 feedback surface
+                    // lands, it becomes the home for a friendly "no speech
+                    // detected" notice; until then this is log-only.
+                    logger.info("Decode found no speech; skipping paste")
                 } catch {
                     logger.error("Transcription failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
                     errorSubject.send(.transcription(underlying: error))

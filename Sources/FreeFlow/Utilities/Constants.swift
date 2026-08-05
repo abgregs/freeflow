@@ -50,7 +50,11 @@ enum Constants {
     // Silence-trim energy gate: a 16 kHz window whose RMS is below this (linear
     // amplitude, not dBFS) is treated as silence and dropped from the ends of the
     // recording. Internal tunable, not a setting — the user shouldn't reason about
-    // dBFS (load-bearing rule #5). Tuned against the 0022 silence corpus on-device.
+    // dBFS (load-bearing rule #5). First-pass value: an on-device probe with
+    // ad-hoc clips showed real room tone peaks ABOVE it (~0.02 RMS windows), so
+    // the trim only catches near-digital silence; realistic near-silence is
+    // handled by `TranscriptionManager.isNonSpeechAnnotation` instead. Tune
+    // against the 0022 silence corpus once it's recorded.
     static let silenceTrimEnergyThreshold: Float = 0.01
 
     // Safety margin kept on each side of detected speech so onset/offset consonants
@@ -58,10 +62,13 @@ enum Constants {
     static let silenceTrimMarginSeconds: Double = 0.1
 
     // Decoding thresholds pinned to upstream Whisper defaults (planning 0023): they
-    // gate silent/near-silent audio to empty output instead of hallucinated text and
-    // drive the temperature fallback for low-confidence segments. WhisperKit 0.18
-    // already defaults to these, but we set them explicitly so the gate can't silently
-    // regress if an upstream default changes. Internal tunables, not settings.
+    // drive the temperature fallback for low-confidence segments and are *meant* to
+    // gate silent audio to empty output — but an on-device probe showed they don't
+    // reliably suppress non-speech ("[BLANK_AUDIO]" still decodes from real room
+    // tone); `isNonSpeechAnnotation` is the layer that actually stops the paste.
+    // WhisperKit 0.18 already defaults to these, but we set them explicitly so the
+    // gate can't silently regress if an upstream default changes. Internal tunables,
+    // not settings.
     static let noSpeechThreshold: Float = 0.6
     static let logProbThreshold: Float = -1.0
     static let compressionRatioThreshold: Float = 2.4
