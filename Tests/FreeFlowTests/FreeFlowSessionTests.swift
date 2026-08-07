@@ -98,6 +98,60 @@ struct FreeFlowSessionTests {
     }
 
     @MainActor
+    @Test("start subscribes to the model publisher and applies the current selection while idle")
+    func startSubscribesToModel() async throws {
+        // planning 0021: the selectedModel publisher emits its current value on
+        // subscribe and applies while idle — a separate counter from the hotkey path.
+        let env = makeSession()
+        #expect(env.session.modelReloadApplyCount == 0)
+        try await env.session.start()
+        #expect(env.session.modelReloadApplyCount == 1)
+        #expect(env.session.modelReloadDeferCount == 0)
+        #expect(env.session.configurationApplyCount == 2)  // hotkey path unaffected
+    }
+
+    @MainActor
+    @Test("model change while idle applies immediately")
+    func modelChangeWhileIdleApplies() async throws {
+        let env = makeSession()
+        try await env.session.start()
+        let baseline = env.session.modelReloadApplyCount
+        env.store.setValue("openai_whisper-base.en", for: Settings.selectedModel)
+        #expect(env.session.modelReloadApplyCount == baseline + 1)
+        #expect(env.session.modelReloadDeferCount == 0)
+        // The switch is applied through a MainActor Task, so the re-point lands on the
+        // next turn of the run loop, not synchronously.
+        await waitUntil { env.transcription.currentModelName == "openai_whisper-base.en" }
+        #expect(env.transcription.currentModelName == "openai_whisper-base.en")
+    }
+
+    @MainActor
+    @Test("a model change mid-cycle defers to the return to .idle")
+    func modelChangeMidCycleDefers() async throws {
+        // A switch mid-recording/processing must never reload the model out from
+        // under the in-flight transcribe; it parks and applies on return to .idle
+        // (planning 0021 AC2), mirroring the hotkey deferral.
+        let env = makeSession()
+        try await env.session.start()
+        let applyBaseline = env.session.modelReloadApplyCount
+
+        env.session.handleActivate()  // → .recording (Hold default)
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        env.store.setValue("openai_whisper-base.en", for: Settings.selectedModel)
+        #expect(env.session.modelReloadApplyCount == applyBaseline)   // not applied yet
+        #expect(env.session.modelReloadDeferCount == 1)               // parked
+        #expect(env.transcription.currentModelName == Constants.defaultModel)  // still the old model
+
+        env.microphone.publishForTest(makeBuffer())
+        await env.session.handleDeactivate()
+        #expect(env.session.currentState == .idle)
+        #expect(env.session.modelReloadApplyCount == applyBaseline + 1)        // pending applied
+        await waitUntil { env.transcription.currentModelName == "openai_whisper-base.en" }
+        #expect(env.transcription.currentModelName == "openai_whisper-base.en")
+    }
+
+    @MainActor
     @Test("stop cancels configuration subscriptions")
     func stopCancelsSubscriptions() async throws {
         let env = makeSession()
@@ -335,8 +389,11 @@ struct FreeFlowSessionTests {
         let store = SettingsStore(defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
         let transcription = TranscriptionManager()
         // Unit tests never load the real model, so mark the model as ready to
-        // exercise the normal recording path without triggering the model gate.
+        // exercise the normal recording path without triggering the model gate, and
+        // skip the async reload so a model switch (planning 0021) exercises the
+        // session's apply-or-defer routing without a real WhisperKit download.
         transcription.setModelLoadStateForTesting(.ready)
+        transcription.skipLoadForTesting = true
         let session = FreeFlowSession(
             accessibility: accessibility,
             microphone: microphone,
@@ -355,6 +412,14 @@ struct FreeFlowSessionTests {
             microphone: microphone,
             transcription: transcription
         )
+    }
+
+    @MainActor
+    private func waitUntil(_ condition: @MainActor () -> Bool) async {
+        for _ in 0..<200 {
+            if condition() { return }
+            try? await Task.sleep(nanoseconds: 5_000_000)   // up to ~1s total
+        }
     }
 
     @MainActor

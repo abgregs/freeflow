@@ -23,6 +23,10 @@ enum Settings {
         name: "launchAtLogin",
         defaultValue: false
     )
+    static let selectedModel = SettingKey<String>(
+        name: "selectedModel",
+        defaultValue: Constants.defaultModel
+    )
 }
 
 @MainActor

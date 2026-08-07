@@ -9,12 +9,15 @@ struct SettingsView: View {
     private var activationMode: ActivationMode = Settings.activationMode.defaultValue
     @AppStorage(Settings.launchAtLogin.name)
     private var launchAtLogin: Bool = Settings.launchAtLogin.defaultValue
+    @AppStorage(Settings.selectedModel.name)
+    private var selectedModel: String = Settings.selectedModel.defaultValue
 
     private let logger = Logger(subsystem: Constants.loggingSubsystem, category: "app")
 
     var body: some View {
         Form {
             activationSection
+            transcriptionSection
             generalSection
             aboutSection
         }
@@ -42,6 +45,27 @@ struct SettingsView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var transcriptionSection: some View {
+        Section("Transcription") {
+            Picker("Model", selection: $selectedModel) {
+                ForEach(Constants.curatedModels) { model in
+                    Text(model.label).tag(model.name)
+                }
+            }
+            if let hint = Constants.curatedModels.first(where: { $0.name == selectedModel })?.hint {
+                Text(hint)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            // Switching keeps the previous model cached (planning 0021 disk-footprint
+            // decision: fast switch-back over reclaiming ~240–630 MB; the Homebrew cask
+            // `zap` clears the whole cache dir, so there's no in-app cleanup UI).
+            Text("Changing the model downloads it the first time and briefly shows a loading status in the menu bar.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
     }
 
