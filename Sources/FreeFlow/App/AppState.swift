@@ -11,6 +11,9 @@ final class AppState {
     private(set) var state: FreeFlowState = .idle
     private(set) var errorMessage: String?
     private(set) var notice: String?
+    /// Model load lifecycle — `.loading` until the model is warm, then `.ready`.
+    /// Menu bar reads this to show "Downloading model…" / "Loading…" during launch.
+    private(set) var modelLoadState: ModelLoadState = .loading
 
     @ObservationIgnored private var cancellables = Set<AnyCancellable>()
 
@@ -23,6 +26,14 @@ final class AppState {
             .store(in: &cancellables)
         session.notices
             .sink { [weak self] notice in self?.apply(notice: notice) }
+            .store(in: &cancellables)
+    }
+
+    // internal for testability — wires the model load state publisher so the
+    // menu bar observes downloading/loading/ready without coupling to the manager.
+    func bind(transcription: TranscriptionManager) {
+        transcription.modelLoadState
+            .sink { [weak self] loadState in self?.apply(modelLoadState: loadState) }
             .store(in: &cancellables)
     }
 
@@ -49,5 +60,11 @@ final class AppState {
     // screen (ADR 0002).
     func apply(_ error: FreeFlowError) {
         errorMessage = LogRedaction.redactUserPaths(error.localizedDescription)
+    }
+
+    // internal for testability — the model load state entry point (also used by
+    // `bind(transcription:)`). Drives the menu bar's download/load/ready label.
+    func apply(modelLoadState: ModelLoadState) {
+        self.modelLoadState = modelLoadState
     }
 }

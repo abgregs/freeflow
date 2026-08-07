@@ -2,6 +2,53 @@ import Foundation
 import Testing
 @testable import FreeFlow
 
+@Suite("TranscriptionManager model load state")
+struct TranscriptionManagerLoadStateTests {
+    // planning 0004: the initial load state is set from a synchronous disk check
+    // at init time so the menu bar shows the right label before `loadModel()` runs.
+
+    @MainActor
+    @Test("initial modelLoadState is downloading or loading (never ready before loadModel)")
+    func initialLoadStateIsNotReady() {
+        // On a machine without the model cached (CI), state is .downloading.
+        // On a machine with the cache, state is .loading. Either is correct —
+        // neither is .ready, which would be a lie before the model is warm.
+        let mgr = TranscriptionManager()
+        #expect(mgr.currentModelLoadState != .ready)
+        #expect(mgr.currentModelLoadState != .failed)
+    }
+
+    @MainActor
+    @Test("setModelLoadStateForTesting drives currentModelLoadState")
+    func testSeamDrivesState() {
+        let mgr = TranscriptionManager()
+        mgr.setModelLoadStateForTesting(.ready)
+        #expect(mgr.currentModelLoadState == .ready)
+        mgr.setModelLoadStateForTesting(.loading)
+        #expect(mgr.currentModelLoadState == .loading)
+    }
+
+    @MainActor
+    @Test("modelLoadState publisher emits the current value on subscribe")
+    func publisherEmitsCurrentValueOnSubscribe() {
+        let mgr = TranscriptionManager()
+        var received: [ModelLoadState] = []
+        let token = mgr.modelLoadState.sink { received.append($0) }
+        defer { token.cancel() }
+        // CurrentValueSubject delivers the current value immediately on subscribe.
+        #expect(received.count == 1)
+        #expect(received.first == mgr.currentModelLoadState)
+    }
+
+    @MainActor
+    @Test("isModelCached returns false when the model directory does not exist")
+    func isModelCachedFalseWhenMissing() {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("ff-test-\(UUID().uuidString)", isDirectory: true)
+        #expect(!TranscriptionManager.isModelCached(downloadBase: temp, modelName: "openai_whisper-small.en"))
+    }
+}
+
 @Suite("TranscriptionManager model gate")
 struct TranscriptionManagerGateTests {
     @MainActor

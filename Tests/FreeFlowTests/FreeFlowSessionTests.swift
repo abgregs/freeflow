@@ -281,6 +281,38 @@ struct FreeFlowSessionTests {
         #expect(env.session.currentState == .idle)
     }
 
+    @MainActor
+    @Test("handleActivate declines and emits a transcription error when the model is not yet ready")
+    func handleActivateDeclinesWhenModelNotReady() {
+        // Planning 0004 AC3: dictating before "Ready" must surface clear feedback
+        // (via the error channel) and must NOT start a recording that loses audio.
+        let env = makeSession()
+        env.transcription.setModelLoadStateForTesting(.loading)  // not ready
+
+        var errors: [FreeFlowError] = []
+        let token = env.session.errors.sink { errors.append($0) }
+        defer { token.cancel() }
+
+        env.session.handleActivate()
+
+        #expect(env.session.currentState == .idle)   // never entered .recording
+        #expect(errors.count == 1)
+        guard case .transcription = errors.first else {
+            Issue.record("expected .transcription, got \(String(describing: errors.first))")
+            return
+        }
+    }
+
+    @MainActor
+    @Test("handleActivate declines during download phase")
+    func handleActivateDeclinesWhenDownloading() {
+        let env = makeSession()
+        env.transcription.setModelLoadStateForTesting(.downloading)
+
+        env.session.handleActivate()
+        #expect(env.session.currentState == .idle)
+    }
+
     // MARK: - Test environment
 
     @MainActor
@@ -290,6 +322,7 @@ struct FreeFlowSessionTests {
         let hotkey: HotkeyManager
         let inputMonitoring: InputMonitoringCapability
         let microphone: MicrophoneCapability
+        let transcription: TranscriptionManager
     }
 
     @MainActor
@@ -300,6 +333,10 @@ struct FreeFlowSessionTests {
         let inputMonitoring = InputMonitoringCapability()
         let hotkey = HotkeyManager(inputMonitoring: inputMonitoring, initialKeyCode: 62)
         let store = SettingsStore(defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
+        let transcription = TranscriptionManager()
+        // Unit tests never load the real model, so mark the model as ready to
+        // exercise the normal recording path without triggering the model gate.
+        transcription.setModelLoadStateForTesting(.ready)
         let session = FreeFlowSession(
             accessibility: accessibility,
             microphone: microphone,
@@ -307,7 +344,7 @@ struct FreeFlowSessionTests {
             hotkey: hotkey,
             audio: AudioCaptureManager(microphone: microphone),
             textInsertion: TextInsertionManager(accessibility: accessibility),
-            transcription: TranscriptionManager(),
+            transcription: transcription,
             settings: store
         )
         return TestEnv(
@@ -315,7 +352,8 @@ struct FreeFlowSessionTests {
             store: store,
             hotkey: hotkey,
             inputMonitoring: inputMonitoring,
-            microphone: microphone
+            microphone: microphone,
+            transcription: transcription
         )
     }
 

@@ -106,9 +106,18 @@ final class FreeFlowSession {
     // internal for testability — state-guarded `.idle` → `.recording` transition.
     // Audio capture is kicked off fire-and-forget so the state change is
     // immediately observable; engine-warmup race is handled at stop time.
+    //
+    // If the model is not yet ready the activation is declined and an error is
+    // surfaced immediately (planning 0004 AC3) — no audio is captured, so no
+    // audio can be silently lost to the `.modelNotLoaded` fail-fast.
     func handleActivate() {
         guard currentState == .idle else {
             logger.info("Ignoring activate in state \(String(describing: self.currentState), privacy: .public)")
+            return
+        }
+        guard transcription.currentModelLoadState == .ready else {
+            logger.info("Ignoring activate: model not ready (\(String(describing: self.transcription.currentModelLoadState), privacy: .public))")
+            errorSubject.send(.transcription(underlying: TranscriptionError.modelNotLoaded))
             return
         }
         stateSubject.send(.recording)
