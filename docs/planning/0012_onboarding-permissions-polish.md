@@ -14,6 +14,8 @@ The reliable path today is the relaunch the onboarding copy already prescribes.
 
 **Proposed fix.** On a probe failure that occurs *right after* `AXIsProcessTrusted()` reports trusted, **retry the probe once or twice with a short settle delay before downgrading**, and consider surfacing "couldn't confirm" (`.unknown`) rather than "not granted" (`.denied`) on a transient failure. Must **preserve the genuine silent-no-op detection** ([anti-patterns.md](../conventions/anti-patterns.md) #3): a *persistent* failure still downgrades to `.denied`; only the just-granted transient is forgiven.
 
+**Field addendum (2026-08-19):** the same false-negative shape appears on every *first launch of a freshly rebuilt binary* — status reads denied at launch, and a Grant-roundtrip + Refresh flips it green with no TCC changes (the pane row was valid throughout; see [../architecture/distribution.md](../architecture/distribution.md)). The implementation should instrument whether `AXIsProcessTrusted()` or the probe is the false-negative source; either way, the settle-retry (plus item 4's post-Grant auto-recheck) is what turns dev rebuilds — and any user's stale-status launch — into a zero-touch experience.
+
 ## 2. No on-demand way to re-open onboarding
 
 **Observed:** after granting one permission (e.g. Input Monitoring, which macOS requires a quit+relaunch for) the flow feels awkward with the others still pending, and there's no obvious way to re-summon the permissions view without relaunching.
