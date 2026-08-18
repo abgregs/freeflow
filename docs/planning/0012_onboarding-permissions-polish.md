@@ -31,17 +31,17 @@ Both grants effectively require a relaunch to take effect — Input Monitoring *
 The exact observed loop on a dev rebuild (and reproducible for any user whose Accessibility row goes stale):
 
 1. Launch → onboarding shows 2 granted, Accessibility "not granted."
-2. User clicks **Grant** → System Settings opens — and shows River *already enabled* (a stale row bound to a previous binary; tccd does not authorize the running one). User reasonably concludes the app is wrong.
-3. The onboarding window has meanwhile **disappeared** (dismissed on Grant), stranding the user.
-4. "Refresh permission status" changes nothing — correctly, since the process genuinely isn't authorized — but offers no recourse or explanation.
-5. The user's only paths: record anyway (dictation is accepted, then dies at paste — see the gate below) or relaunch into the same loop. The actual fix (remove the stale row with **−**, re-add fresh) is documented nowhere in the product.
+2. User clicks **Grant** → System Settings opens — and shows River *already toggled on*. Two very different causes produce this identical view, and the user can't tell them apart: a **stale row** bound to a previous binary (tccd does not authorize the running one; toggling it fixes nothing — it must be removed and re-added), or a **fresh valid row** where the grant genuinely took and only the app's displayed status is behind. Either way the user reasonably wonders whether Grant did anything at all.
+3. Meanwhile the onboarding window is easy to lose — Settings opens over it (often on another Space/screen) and nothing re-fronts or tracks it, so the user has to go hunt for it. Not a dismissal bug; a discoverability gap in the flow.
+4. In the stale-row case, "Refresh permission status" changes nothing — correctly, since the process genuinely isn't authorized — but offers no recourse or explanation. In the valid-row case (verified 2026-08-18 after a clean delete + reinstall), Refresh **does** flip the row green — but only if the user knows to go back and press it; nothing in the flow says so.
+5. A user who instead just closes Settings and starts dictating is accepted into a recording that can only die at paste time — see the gate below. And in the stale-row case, the actual fix (remove the row with **−**, re-add fresh) is documented nowhere in the product.
 
 Root cause and the durable fix, field-verified: rows created by tccd via a request API survive rebuilds (Microphone's native prompt row did); pane-added rows don't — and Accessibility can *only* be pane-added today because the app never calls the prompting APIs. See [../architecture/distribution.md](../architecture/distribution.md) "Permissions across installs and rebuilds."
 
 **Proposed fixes (extending items 1–3):**
 
 - **Call the request APIs.** `AXIsProcessTrustedWithOptions([prompt: true])` for Accessibility and `IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)` for Input Monitoring, from the onboarding Grant action — tccd then creates and owns the row against the stable signing identity, the OS dialog deep-links the user correctly, and the stale-row trap can't form.
-- **The onboarding window survives Grant.** It must stay up (or reliably return) so the user always has the status view and the Refresh affordance mid-flow.
+- **The onboarding window re-fronts after the Grant round-trip.** It never actually closes, but Settings buries it; re-fronting it when the user returns (or on a status change) keeps the status view and the Refresh affordance in hand — and a post-Grant auto-recheck would remove the need to know about Refresh at all.
 - **Stale-row guidance.** When a Refresh after a Grant round-trip still reads denied, onboarding should say the quiet part: "If River already appears enabled in System Settings, remove it with − and add it again" — the only working recovery until the row is tccd-owned.
 - **Pre-recording capability gate.** `handleActivate` currently gates on model-readiness but not on capability status: the app logged Accessibility as denied, re-opened onboarding, *and still accepted a 35-second dictation* that could only die at paste time. A known-denied capability must decline activation up front (the 0004 gate pattern: decline + error toast), so the user's speech is never accepted into a doomed cycle.
 
@@ -50,7 +50,7 @@ Root cause and the durable fix, field-verified: rows created by tccd via a reque
 1. Toggling Accessibility on reflects as "granted" on the first Refresh (or after the prescribed relaunch) without repeated clicks — **and** a genuinely silent-no-op bundle still downgrades to denied.
 2. The user can re-open the permissions view at any time from the menu bar, without relaunching.
 3. Relaunch guidance reads as the expected step, not a last resort.
-4. Granting Accessibility/Input Monitoring goes through the request APIs: the row is tccd-created, survives a same-identity rebuild, and the Grant flow keeps the onboarding window available throughout.
+4. Granting Accessibility/Input Monitoring goes through the request APIs: the row is tccd-created, survives a same-identity rebuild, and after the Grant round-trip the onboarding window is re-fronted with a fresh status check (no user-discovered Refresh required).
 5. With any required capability known-denied, activation is declined with clear feedback before audio capture starts — no dictation is accepted into a cycle that cannot paste.
 6. A persistent post-grant denied status surfaces the stale-row recovery guidance (remove and re-add), not a bare "not granted."
 
