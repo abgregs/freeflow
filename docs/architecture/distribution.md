@@ -17,7 +17,17 @@ The App Store is intentionally not a channel. **Why:** the sandbox forbids globa
 | **Free Flow Dev** | Local installs via Makefile | Self-signed certificate in user's login keychain | Persistent across rebuilds on a developer machine |
 | **Developer ID Application** | DMG releases and Homebrew cask | Apple Developer Program ($99/yr) | Tied to the Apple developer account |
 
-Local builds always use Free Flow Dev. **Why:** ad-hoc signing produces a new code-directory hash on every build, which invalidates TCC entries (Accessibility / Input Monitoring), forcing the user to re-grant permissions every rebuild. A persistent local identity keeps the same hash, so TCC grants stick.
+Local builds always use Free Flow Dev. **Why:** ad-hoc signing produces a new code-directory hash on every build, which invalidates TCC entries (Accessibility / Input Monitoring), forcing the user to re-grant permissions every rebuild. A persistent local identity is *supposed* to keep grants stable across rebuilds — but see the correction below: that only holds for grants the app *requested*; it does **not** hold for rows added manually in System Settings, which is currently the only way Accessibility can be granted at all.
+
+## Permissions across installs and rebuilds (field-corrected 2026-08-18)
+
+The previous revision of this doc claimed TCC grants stick across rebuilds under the persistent identity. On-device experience during the 0004/0021/0002 smoke falsified that for Accessibility. The corrected model:
+
+- **Rows created by tccd via a request API survive rebuilds.** Microphone (granted through the native `AVCaptureDevice.requestAccess` prompt) carried across a `make install` rebuild untouched. tccd records these against the signing identity, which the persistent cert keeps stable.
+- **Rows added manually in the System Settings pane do not.** The Accessibility row (pane-added, because the app never calls `AXIsProcessTrustedWithOptions` with the prompt option — the 0012 gap) bound to the specific binary and read as *denied* the moment a rebuilt binary launched — while the pane still displayed the stale row as enabled. That mismatch is the confusing trap: Settings says granted, the app honestly says denied, and toggling the stale row fixes nothing.
+- **Recovery protocol for a dev rebuild that loses Accessibility:** quit the app → `tccutil reset Accessibility com.freeflow.app` (removes the stale row) → System Settings → Accessibility → **+** → add `/Applications/FreeFlow.app` fresh → relaunch. Toggling the existing stale row is a no-op; it must be removed/re-added.
+- **The structural fix is 0012** ([planning/0012](../planning/0012_onboarding-permissions-polish.md)): call the request APIs so tccd owns durable rows for Accessibility and Input Monitoring the same way it does for Microphone.
+- **Release-channel users are on the durable path.** Developer ID + notarized builds keep one stable identity across upgrades (cask reinstall, Sparkle updates), so end users don't ride this edge. The one hard rule: never install a differently-signed build *over* a cask-owned app — uninstall the cask first (the 2026-08-14 lesson), or grants break with the same Settings-says-granted confusion.
 
 Release builds use Developer ID. **Why:** macOS Gatekeeper warns sharply on Developer ID-unsigned downloads; for an app that asks for Accessibility this kills trust. Developer ID + notarization makes the app a first-class macOS citizen.
 
