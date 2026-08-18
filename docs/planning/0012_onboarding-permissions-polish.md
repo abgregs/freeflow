@@ -26,11 +26,33 @@ The reliable path today is the relaunch the onboarding copy already prescribes.
 
 Both grants effectively require a relaunch to take effect — Input Monitoring *always* (the event tap is created at startup). The onboarding copy mentions it ("if it still shows Not granted, quit and relaunch"), but undersells it. Consider stating relaunch as the expected finalizer, not a fallback.
 
+## 4. Field flow (2026-08-18): the stale-row dead end — added from the 0004/0021/0002 on-device smoke
+
+The exact observed loop on a dev rebuild (and reproducible for any user whose Accessibility row goes stale):
+
+1. Launch → onboarding shows 2 granted, Accessibility "not granted."
+2. User clicks **Grant** → System Settings opens — and shows River *already enabled* (a stale row bound to a previous binary; tccd does not authorize the running one). User reasonably concludes the app is wrong.
+3. The onboarding window has meanwhile **disappeared** (dismissed on Grant), stranding the user.
+4. "Refresh permission status" changes nothing — correctly, since the process genuinely isn't authorized — but offers no recourse or explanation.
+5. The user's only paths: record anyway (dictation is accepted, then dies at paste — see the gate below) or relaunch into the same loop. The actual fix (remove the stale row with **−**, re-add fresh) is documented nowhere in the product.
+
+Root cause and the durable fix, field-verified: rows created by tccd via a request API survive rebuilds (Microphone's native prompt row did); pane-added rows don't — and Accessibility can *only* be pane-added today because the app never calls the prompting APIs. See [../architecture/distribution.md](../architecture/distribution.md) "Permissions across installs and rebuilds."
+
+**Proposed fixes (extending items 1–3):**
+
+- **Call the request APIs.** `AXIsProcessTrustedWithOptions([prompt: true])` for Accessibility and `IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)` for Input Monitoring, from the onboarding Grant action — tccd then creates and owns the row against the stable signing identity, the OS dialog deep-links the user correctly, and the stale-row trap can't form.
+- **The onboarding window survives Grant.** It must stay up (or reliably return) so the user always has the status view and the Refresh affordance mid-flow.
+- **Stale-row guidance.** When a Refresh after a Grant round-trip still reads denied, onboarding should say the quiet part: "If River already appears enabled in System Settings, remove it with − and add it again" — the only working recovery until the row is tccd-owned.
+- **Pre-recording capability gate.** `handleActivate` currently gates on model-readiness but not on capability status: the app logged Accessibility as denied, re-opened onboarding, *and still accepted a 35-second dictation* that could only die at paste time. A known-denied capability must decline activation up front (the 0004 gate pattern: decline + error toast), so the user's speech is never accepted into a doomed cycle.
+
 ## Acceptance criteria
 
 1. Toggling Accessibility on reflects as "granted" on the first Refresh (or after the prescribed relaunch) without repeated clicks — **and** a genuinely silent-no-op bundle still downgrades to denied.
 2. The user can re-open the permissions view at any time from the menu bar, without relaunching.
 3. Relaunch guidance reads as the expected step, not a last resort.
+4. Granting Accessibility/Input Monitoring goes through the request APIs: the row is tccd-created, survives a same-identity rebuild, and the Grant flow keeps the onboarding window available throughout.
+5. With any required capability known-denied, activation is declined with clear feedback before audio capture starts — no dictation is accepted into a cycle that cannot paste.
+6. A persistent post-grant denied status surfaces the stale-row recovery guidance (remove and re-add), not a bare "not granted."
 
 ## Related
 
