@@ -144,16 +144,21 @@ final class TranscriptionManager {
         logger.info("Loading WhisperKit model \(self.modelName, privacy: .public)")
         let downloadBase = Self.modelDownloadBase()
         let modelName = self.modelName
-        let subject = loadStateSubject  // capture reference; task updates state mid-flight
 
-        let task = Task<WhisperKit, Error> {
+        let task = Task<WhisperKit, Error> { [weak self] in
             // Download under Application Support (planning 0010).
             try FileManager.default.createDirectory(at: downloadBase, withIntermediateDirectories: true)
             // Phase 1: download or find cached model files. `load: false` skips the
             // in-memory load so we can emit the `.loading` transition before it.
             let wk = try await WhisperKit(model: modelName, downloadBase: downloadBase, load: false)
-            // Phase 2: files confirmed on disk — now loading CoreML models into memory.
-            subject.send(.loading)
+            // Phase 2: files confirmed on disk — now loading CoreML models into
+            // memory. Generation-guarded like the completion paths: a superseded
+            // load finishing its download must not mislabel the *newer* switch's
+            // published state (e.g. flip "Downloading model…" to "Loading…" while
+            // another model's download is what the user is actually waiting on).
+            if let self, self.loadGeneration == generation {
+                self.emitLoadState(.loading)
+            }
             try await wk.loadModels()
             return wk
         }
@@ -164,16 +169,24 @@ final class TranscriptionManager {
             // `switchModel` owns `whisperKit`/state now, so drop this stale result.
             guard generation == loadGeneration else { return }
             whisperKit = wk
-            loadStateSubject.send(.ready)
+            emitLoadState(.ready)
             logger.info("WhisperKit model loaded")
         } catch {
             // Don't overwrite a newer switch's state with this superseded failure.
             guard generation == loadGeneration else { throw error }
             loadTask = nil
-            loadStateSubject.send(.failed)
+            emitLoadState(.failed)
             logger.error("WhisperKit load failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
             throw error
         }
+    }
+
+    // Every runtime load-state transition goes through here so on-device incidents
+    // (e.g. "the HUD hid while a model was still loading") leave a trace of exactly
+    // which state fired and when. State names only — no user content (logging.md).
+    private func emitLoadState(_ state: ModelLoadState) {
+        logger.info("Model load state -> \(String(describing: state), privacy: .public)")
+        loadStateSubject.send(state)
     }
 
     // internal for testability — the model picker's current selection, so session
@@ -196,7 +209,7 @@ final class TranscriptionManager {
         loadTask?.cancel()
         loadTask = nil
         let isCached = Self.isModelCached(downloadBase: Self.modelDownloadBase(), modelName: newModelName)
-        loadStateSubject.send(isCached ? .loading : .downloading)
+        emitLoadState(isCached ? .loading : .downloading)
         return true
     }
 

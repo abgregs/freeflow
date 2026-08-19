@@ -325,3 +325,80 @@ struct InputMonitoringDecodeTests {
         #expect(InputMonitoringCapability.decode(event) == nil)
     }
 }
+
+@Suite("MicrophoneCapability level metering")
+struct MicrophoneLevelTests {
+    // The level path (planning 0020): RMS and normalized-level are pure and
+    // audio-thread-safe, tested on synthetic loud/quiet/silent buffers with no real
+    // mic (AC2); the publish throttle uses an injectable clock (AC3). Same
+    // fake-buffer pattern as AudioCaptureManagerTests.
+
+    @MainActor
+    @Test("rms is zero for silence and rises with amplitude")
+    func rmsTracksAmplitude() {
+        let silence = MicrophoneCapability.rms(of: makeLevelBuffer(amplitude: 0))
+        let quiet = MicrophoneCapability.rms(of: makeLevelBuffer(amplitude: 0.05))
+        let loud = MicrophoneCapability.rms(of: makeLevelBuffer(amplitude: 0.5))
+        #expect(silence == 0)
+        #expect(quiet > 0)
+        #expect(loud > quiet)
+    }
+
+    @MainActor
+    @Test("normalizedLevel: 0 for silence, proportional when quiet, clamped to 1 when loud")
+    func normalizedLevelMapping() {
+        // A silent mic maps to a resting meter; quiet-but-present speech shows small
+        // bars (the diagnostic 0020 wants); a loud peak clamps rather than overflowing.
+        #expect(MicrophoneCapability.normalizedLevel(rms: 0) == 0)
+        let quiet = MicrophoneCapability.normalizedLevel(rms: 0.02)
+        #expect(quiet > 0 && quiet < 1)
+        #expect(MicrophoneCapability.normalizedLevel(rms: 1.0) == 1)
+    }
+
+    @MainActor
+    @Test("emitLevel publishes on the level publisher and throttles within the interval")
+    func emitLevelThrottles() {
+        // Samples arriving inside `levelMeterPublishInterval` of the last emission
+        // are dropped; a sample past the interval emits again. The injected clock
+        // makes this deterministic — no wall-clock waiting, no real engine.
+        let clock = MutableClock()
+        let mic = MicrophoneCapability(now: { clock.now })
+        var received: [Float] = []
+        let cancellable = mic.inputLevels.sink { received.append($0) }
+        defer { cancellable.cancel() }
+
+        clock.now = 100
+        mic.emitLevel(rms: 0.2)                                          // first: always emits
+        mic.emitLevel(rms: 0.2)                                          // same instant: throttled
+        clock.now = 100 + Constants.levelMeterPublishInterval / 2
+        mic.emitLevel(rms: 0.2)                                          // within interval: throttled
+        clock.now = 100 + Constants.levelMeterPublishInterval * 2
+        mic.emitLevel(rms: 0.2)                                          // past interval: emits
+
+        #expect(received.count == 2)
+    }
+}
+
+// A mutable monotonic clock for the throttle test; read on the main actor via the
+// capability's injected `now`.
+private final class MutableClock {
+    var now: TimeInterval = 0
+}
+
+// Synthetic mono Float32 buffer holding a 440 Hz sine at the given amplitude, so the
+// pure RMS/level helpers can be exercised without a real microphone.
+@MainActor
+private func makeLevelBuffer(
+    amplitude: Float, frames: Int = 1024, sampleRate: Double = 44_100
+) -> AVAudioPCMBuffer {
+    let format = AVAudioFormat(
+        commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false
+    )!
+    let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames))!
+    buffer.frameLength = AVAudioFrameCount(frames)
+    let channel = buffer.floatChannelData![0]
+    for i in 0..<frames {
+        channel[i] = amplitude * Float(sin(2.0 * .pi * 440 * Double(i) / sampleRate))
+    }
+    return buffer
+}
