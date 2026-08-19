@@ -44,11 +44,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         OnboardingCoordinator(capabilities: capabilities)
     }()
 
+    private(set) lazy var recordingIndicator: RecordingIndicatorCoordinator = {
+        RecordingIndicatorCoordinator(appState: appState)
+    }()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Application did finish launching")
         appState.bind(to: session)
         appState.bind(transcription: transcription)
+        appState.bind(microphone: microphone)
         onboarding.start()
+        recordingIndicator.start()
         Task { @MainActor in
             do { try await session.start() }
             catch { logger.error("Failed to start session: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)") }
