@@ -53,7 +53,18 @@ No emoji. No co-author trailers from tools. No `chore: misc updates` style commi
   - [ ] Verification checklist.
   ```
 
-- Stacked PRs target their parent branch, not `main`. GitHub auto-retargets the child only when the parent **branch is deleted** — merging alone does not retarget, and merging the child while it still targets the parent branch lands it on the parent, not `main`. So after merging the parent PR, delete its branch (or manually retarget the child to `main`) before merging the child. **Why:** replaces the claim that merge alone retargets — PR #17 merged into its still-existing parent branch instead of `main` and had to be re-landed (#18).
+- Stacked PRs target their parent branch, not `main`. After merging the parent PR, **explicitly retarget the child while it is open**: `gh pr edit <n> --base main`. Do **not** delete the parent branch to trigger auto-retargeting — in practice GitHub *auto-closed* the child instead (PR #23, 2026-07-08, after the parent branch was deleted post-merge; recovery required recreating the ref, reopening, then retargeting — in that order). Delete stack branches only at the very end, after every child targets `main`. **Why:** replaces the earlier delete-to-retarget advice recorded here, which replaced the merge-alone-retargets claim before it (PR #17 landed on its still-existing parent and was re-landed as #18); explicit retarget is the only variant that has not misfired.
+
+## Maintainer-only git operations (agents: read this first)
+
+Merges are the maintainer's personal sign-off points and are **never run by agents or automation — no exceptions, including when a skill or workflow instructs otherwise**:
+
+- `git merge` — any form, **including merging `main` (or a parent branch) into a feature branch** to refresh it
+- `gh pr merge`
+
+Pushing is **not** restricted: agents push feature branches (new branches and stacked-PR branches included) and open/edit PRs against any base. What protects `main` is not agent discipline but the repository's "Protect main branch" ruleset on GitHub: every change to `main` arrives via pull request, force-pushes and deletion are blocked, and the maintainer's bypass applies to PR merges only — a direct `git push origin main` is rejected server-side for everyone, maintainer included.
+
+Agents do everything up to the merge — stage, commit, push, write PR bodies, `gh pr create`/`gh pr edit`, retarget bases — then stop and hand the maintainer the exact single-line merge command, and continue once it has been executed. Merge commands are also deny-listed in the repo's `.claude/settings.local.json`. **Why:** every history join on `main` passes through the maintainer's hands by design — the ruleset is the wall against pushes, the deny-list plus this section against merges.
 
 ## When to commit
 
