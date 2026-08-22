@@ -5,7 +5,7 @@
 - **`main`** is always green and always installable. Protected — no direct pushes.
 - **Feature branches** off `main`: `feat/<short-description>`, `fix/<short-description>`, `docs/<short-description>`.
 - The `docs/doc-sync-*` prefix is reserved for the automated doc-sync routine's branches ([doc-maintenance.md](doc-maintenance.md)).
-- **Stacked branches** allowed when work naturally chains: `feat/foo-step-2` branches off `feat/foo-step-1`. Both target `main`; rebase the dependent after the parent merges.
+- **Stacked branches** allowed when work naturally chains: `feat/foo-step-2` branches off `feat/foo-step-1`. At creation each targets its **parent**; a child retargets to `main` only after its parent merges (see the stacked-PR rules under Pull requests). **Why:** replaces the "both target main" wording that contradicted the PR-section convention — targeting the parent at creation is what keeps a stacked PR's diff reviewable as just its own changes.
 
 ## Commits
 
