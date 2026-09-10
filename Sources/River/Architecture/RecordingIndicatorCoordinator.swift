@@ -43,6 +43,7 @@ final class RecordingIndicatorCoordinator {
         withObservationTracking {
             _ = appState.state
             _ = appState.toast
+            _ = appState.modelLoadState
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
@@ -54,7 +55,9 @@ final class RecordingIndicatorCoordinator {
 
     private func updateVisibility() {
         let shouldShow = RecordingIndicatorPresentation.isOnScreen(
-            state: appState.state, hasToast: appState.toast != nil
+            state: appState.state,
+            hasToast: appState.toast != nil,
+            modelLoadState: appState.modelLoadState
         )
         if shouldShow {
             orderOutWork?.cancel()

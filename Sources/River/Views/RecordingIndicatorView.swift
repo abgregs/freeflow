@@ -33,9 +33,12 @@ struct RecordingIndicatorView: View {
                 .strokeBorder(.white.opacity(0.08))
         )
         .opacity(RecordingIndicatorPresentation.isOnScreen(
-            state: appState.state, hasToast: appState.toast != nil) ? 1 : 0)
+            state: appState.state,
+            hasToast: appState.toast != nil,
+            modelLoadState: appState.modelLoadState) ? 1 : 0)
         .animation(.easeInOut(duration: Constants.hudFadeSeconds), value: appState.state)
         .animation(.easeInOut(duration: Constants.hudFadeSeconds), value: appState.toast)
+        .animation(.easeInOut(duration: Constants.hudFadeSeconds), value: appState.modelLoadState)
     }
 
     @ViewBuilder
@@ -54,9 +57,19 @@ struct RecordingIndicatorView: View {
                 Text("Transcribing…").font(.callout)
             }
         case .idle:
-            // Nothing to show when idle; the panel is fading out (or up only for a
-            // lingering toast, which the toast row above handles).
-            EmptyView()
+            // Idle + model still loading: the HUD is the primary loading surface
+            // (planning 0004 follow-through) — show the wait proactively instead of
+            // leaving the user to trip the activation gate. Otherwise nothing: the
+            // panel is fading out (or up only for a lingering toast, which the
+            // toast row above handles).
+            if let label = RecordingIndicatorPresentation.loadingLabel(for: appState.modelLoadState) {
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text(label).font(.callout)
+                }
+            } else {
+                EmptyView()
+            }
         }
     }
 }
