@@ -9,6 +9,8 @@ struct SettingsView: View {
     private var activationMode: ActivationMode = Settings.activationMode.defaultValue
     @AppStorage(Settings.launchAtLogin.name)
     private var launchAtLogin: Bool = Settings.launchAtLogin.defaultValue
+    @AppStorage(Settings.playFeedbackSounds.name)
+    private var playFeedbackSounds: Bool = Settings.playFeedbackSounds.defaultValue
     @AppStorage(Settings.selectedModel.name)
     private var selectedModel: String = Settings.selectedModel.defaultValue
 
@@ -75,6 +77,7 @@ struct SettingsView: View {
                 .onChange(of: launchAtLogin) { _, enabled in
                     updateLaunchAtLogin(enabled)
                 }
+            Toggle("Sound effects", isOn: $playFeedbackSounds)
         }
     }
 
