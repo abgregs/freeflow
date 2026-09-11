@@ -28,12 +28,22 @@ struct SoundFeedbackControllerTests {
         #expect(SoundFeedbackController.cue(from: .idle, to: .processing) == nil)
     }
 
-    @Test("recording→idle (a canceled recording) produces no cue")
-    func recordingToIdleIsNil() {
-        // Planning 0017: cancel transitions .recording → .idle directly. That is
-        // deliberately silent — the end cue means "now transcribing," which a
-        // discard is not.
-        #expect(SoundFeedbackController.cue(from: .recording, to: .idle) == nil)
+    @Test("recording→idle (a canceled recording) produces the cancel cue")
+    func recordingToIdleIsCancel() {
+        // Planning 0017: cancel transitions .recording → .idle directly, and gets
+        // its own cue — not the end cue (which means "now transcribing," and a
+        // discard is not that), and not silence (0016 exists for the moment the
+        // user is looking at the text field rather than the HUD).
+        #expect(SoundFeedbackController.cue(from: .recording, to: .idle) == .cancel)
+    }
+
+    @Test("the cancel cue is distinct from the begin and end cues")
+    func cancelCueIsDistinct() {
+        // The point of a third cue is that it is tellable apart. If a future
+        // refactor collapses cancel onto begin or end, this fails.
+        let cancel = SoundFeedbackController.cue(from: .recording, to: .idle)
+        #expect(cancel != SoundFeedbackController.cue(from: .idle, to: .recording))
+        #expect(cancel != SoundFeedbackController.cue(from: .recording, to: .processing))
     }
 
     // MARK: - handleStateChange with setting on
@@ -97,6 +107,41 @@ struct SoundFeedbackControllerTests {
         controller.handleStateChange()
 
         #expect(fakePlayer.cues == [.begin, .end, .begin, .end])
+    }
+
+    @Test("a canceled cycle cues begin then cancel, and the next cycle is unaffected")
+    func canceledCycleThenNormalCycle() {
+        // Exercises previousState bookkeeping across the cancel path: the canceled
+        // cycle must not leave the controller mis-tracking state such that the
+        // following normal cycle loses or duplicates a cue.
+        let (controller, fakePlayer, appState) = makeController(soundsEnabled: true)
+        controller.start()
+
+        appState.apply(.recording)
+        controller.handleStateChange()
+        appState.apply(.idle)            // canceled: recording→idle
+        controller.handleStateChange()
+
+        appState.apply(.recording)
+        controller.handleStateChange()
+        appState.apply(.processing)
+        controller.handleStateChange()
+
+        #expect(fakePlayer.cues == [.begin, .cancel, .begin, .end])
+    }
+
+    @Test("no cancel cue plays when the toggle is off")
+    func cancelCueRespectsTheToggle() {
+        // The third cue rides the same single setting — no separate switch.
+        let (controller, fakePlayer, appState) = makeController(soundsEnabled: false)
+        controller.start()
+
+        appState.apply(.recording)
+        controller.handleStateChange()
+        appState.apply(.idle)
+        controller.handleStateChange()
+
+        #expect(fakePlayer.cues.isEmpty)
     }
 
     // MARK: - Helpers

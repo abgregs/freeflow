@@ -210,6 +210,14 @@ final class RiverSession {
                         logger.error("Text insertion failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
                         errorSubject.send(.textInsertion(underlying: error))
                     }
+                } catch TranscriptionError.noSpeechDetected {
+                    // Decode heard only non-speech (breath, room tone, music the
+                    // trim didn't catch): same policy as the all-silence branch
+                    // above — nothing was said, so no paste and no error glyph
+                    // (planning 0023). When the 0002/0018/0020 feedback surface
+                    // lands, it becomes the home for a friendly "no speech
+                    // detected" notice; until then this is log-only.
+                    logger.info("Decode found no speech; skipping paste")
                 } catch {
                     logger.error("Transcription failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
                     errorSubject.send(.transcription(underlying: error))
@@ -244,6 +252,10 @@ final class RiverSession {
         logger.info("Cancel: discarding in-flight recording (no transcription, no paste)")
         let audio = self.audio
         Task { @MainActor in await audio.discardRecording() }
+        // The recording ended without a tap, so the tap machine still believes one
+        // is in flight. Clear it or the user's next tap is consumed as a `stop` for
+        // the discarded recording and a second tap is needed to start a new one.
+        hotkey.resetTapState()
         stateSubject.send(.idle)
         logger.info("State -> idle (canceled)")
         noticeSubject.send(ActivationNotice.recordingCanceled)
