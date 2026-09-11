@@ -16,6 +16,7 @@ struct ErrorToastPresentationTests {
             .audioCapture(underlying: dummy),
             .transcription(underlying: dummy),
             .textInsertion(underlying: dummy),
+            .permission(capability: "Accessibility"),
         ]
         for error in errors {
             let toast = ErrorToastPresentation.toast(for: error)
