@@ -487,6 +487,43 @@ struct FreeFlowSessionTests {
     // MARK: - Test environment
 
     @MainActor
+    @Test("in a tap mode, the tap after a cancel starts a new recording immediately")
+    func tapAfterCancelStartsImmediately() async throws {
+        // Planning 0017 field bug, observed on-device in both tap modes: cancel ends
+        // the recording through the session rather than through a tap, so without a
+        // reset the tap machine stays in `.recording` and eats the next tap as a
+        // `stop` for a recording that no longer exists. The user had to press the
+        // activation key twice to start again. Timing-independent — the stale state
+        // persists indefinitely, so this asserts behavior, not a race.
+        let env = makeSession()
+        // Set the mode through the store, before `start()` subscribes — setting it
+        // on the hotkey afterward gets overwritten when the configuration
+        // subscription delivers the store's default.
+        env.store.setValue(ActivationMode.singleTap, for: Settings.activationMode)
+        try await env.session.start()
+        env.session.wireHotkeyCallbacks()   // drive the real hotkey → session chain
+
+        // Drive the key the session actually watches: `subscribeToConfiguration`
+        // applies the store's activation key, overwriting `makeSession`'s literal.
+        let key = Int64(Constants.defaultActivationKeyCode)
+
+        // Tap: key-down then key-up completes one tap and starts a recording.
+        env.hotkey.handle(.flagsChanged(keyCode: key, flags: .maskAlternate))
+        env.hotkey.handle(.flagsChanged(keyCode: key, flags: []))
+        try await Task.sleep(nanoseconds: 20_000_000)
+        #expect(env.session.currentState == .recording)
+
+        env.session.handleCancel()
+        #expect(env.session.currentState == .idle)
+
+        // The very next tap must start a fresh recording, not be swallowed.
+        env.hotkey.handle(.flagsChanged(keyCode: key, flags: .maskAlternate))
+        env.hotkey.handle(.flagsChanged(keyCode: key, flags: []))
+        try await Task.sleep(nanoseconds: 20_000_000)
+        #expect(env.session.currentState == .recording)
+    }
+
+    @MainActor
     private struct TestEnv {
         let session: FreeFlowSession
         let store: SettingsStore

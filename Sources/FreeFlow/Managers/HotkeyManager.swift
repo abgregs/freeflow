@@ -75,6 +75,20 @@ final class HotkeyManager {
         tapMachine.setMode(newMode)
     }
 
+    /// Clears the tap machine after a recording was discarded out-of-band
+    /// (planning 0017). Cancel ends the recording through the session, not
+    /// through a tap, so the tap machine would otherwise stay in `.recording`
+    /// and consume the user's next tap as a `stop` for a recording that no
+    /// longer exists — costing them a keypress before a new one starts.
+    ///
+    /// Deliberately does NOT reset `isKeyDown`: in Hold mode the activation key
+    /// is physically held down during a cancel, and clearing the latch would
+    /// make the eventual release read as a press. Hold mode never routes through
+    /// the tap machine, so resetting only that is both sufficient and safe.
+    func resetTapState() {
+        tapMachine.reset()
+    }
+
     // internal for testability — subscribes to the capability's event stream
     // without creating a real tap, so tests can drive synthetic events through.
     func bindEventStream() {
