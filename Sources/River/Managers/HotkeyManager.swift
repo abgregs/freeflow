@@ -14,21 +14,30 @@ final class HotkeyManager {
 
     var onActivate: (() -> Void)?
     var onDeactivate: (() -> Void)?
+    /// The cancel gesture fired (planning 0017). `RiverSession` guards it to
+    /// `.recording`, so firing outside a recording is a harmless no-op.
+    var onCancel: (() -> Void)?
 
     private var watchedKeyCode: Int
     private var mode: ActivationMode
+    private let cancelKeyCode: Int
     private let tapMachine: TapStateMachine
     private var isKeyDown = false
+    // Press latch for the cancel modifier, tracked separately from the activation
+    // key so a cancel-key edge never disturbs the activation latch (and vice versa).
+    private var isCancelKeyDown = false
     private var cancellables = Set<AnyCancellable>()
 
     init(
         inputMonitoring: InputMonitoringCapability,
         initialKeyCode: Int = Constants.defaultActivationKeyCode,
-        initialMode: ActivationMode = Constants.defaultActivationMode
+        initialMode: ActivationMode = Constants.defaultActivationMode,
+        cancelKeyCode: Int = Constants.cancelKeyCode
     ) {
         self.inputMonitoring = inputMonitoring
         self.watchedKeyCode = initialKeyCode
         self.mode = initialMode
+        self.cancelKeyCode = cancelKeyCode
         self.tapMachine = TapStateMachine(mode: initialMode, windowMs: Constants.doubleTapWindowMs)
     }
 
@@ -41,6 +50,7 @@ final class HotkeyManager {
         cancellables.removeAll()
         await inputMonitoring.stopTap()
         isKeyDown = false
+        isCancelKeyDown = false
     }
 
     /// Live-apply for the watched key. Resets the press latch so a half-press
@@ -65,6 +75,20 @@ final class HotkeyManager {
         tapMachine.setMode(newMode)
     }
 
+    /// Clears the tap machine after a recording was discarded out-of-band
+    /// (planning 0017). Cancel ends the recording through the session, not
+    /// through a tap, so the tap machine would otherwise stay in `.recording`
+    /// and consume the user's next tap as a `stop` for a recording that no
+    /// longer exists — costing them a keypress before a new one starts.
+    ///
+    /// Deliberately does NOT reset `isKeyDown`: in Hold mode the activation key
+    /// is physically held down during a cancel, and clearing the latch would
+    /// make the eventual release read as a press. Hold mode never routes through
+    /// the tap machine, so resetting only that is both sufficient and safe.
+    func resetTapState() {
+        tapMachine.reset()
+    }
+
     // internal for testability — subscribes to the capability's event stream
     // without creating a real tap, so tests can drive synthetic events through.
     func bindEventStream() {
@@ -83,6 +107,15 @@ final class HotkeyManager {
     func handle(_ event: TapEvent) {
         switch event {
         case .flagsChanged(let keyCode, _):
+            // The cancel modifier (planning 0017) is interpreted off the same
+            // already-watched `.flagsChanged` stream — no second tap, no mask change,
+            // so the 0006 least-privilege posture is untouched. It's disabled when it
+            // would collide with the activation key (that key already means stop);
+            // the menu item remains the fallback.
+            if Int(keyCode) == cancelKeyCode, cancelKeyCode != watchedKeyCode {
+                handleCancelKey()
+                return
+            }
             guard Int(keyCode) == watchedKeyCode else { return }
             isKeyDown.toggle()
             switch mode {
@@ -100,6 +133,16 @@ final class HotkeyManager {
             // Capability self-heals; nothing for the manager to do.
             break
         }
+    }
+
+    // internal for testability — the cancel modifier toggles its own latch and
+    // fires on the press (key-down) edge only, so one tap of the cancel key is one
+    // cancel. Mode-agnostic: cancel works identically in Hold and both tap modes.
+    private func handleCancelKey() {
+        isCancelKeyDown.toggle()
+        guard isCancelKeyDown else { return }
+        logger.info("Cancel gesture (keycode \(self.cancelKeyCode, privacy: .public))")
+        onCancel?()
     }
 
     private func fireActivate() {

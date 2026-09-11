@@ -20,4 +20,13 @@ struct ActivationModeTests {
         #expect(ActivationNotice.keyChanged(toKeyCode: 61).contains("Right Option"))
         #expect(ActivationNotice.modeChanged(to: .doubleTap).contains("Double Tap"))
     }
+
+    @Test("keyChanged falls back to generic phrasing for an unknown keycode")
+    func keyChangedUnknownKeycode() {
+        // A keycode absent from `ActivationKeyOption.all` (e.g. a future/removed
+        // key) must not crash or emit a blank label — the `?? "the new key"`
+        // fallback keeps the notice grammatical.
+        let notice = ActivationNotice.keyChanged(toKeyCode: -1)
+        #expect(notice.contains("the new key"))
+    }
 }

@@ -26,12 +26,12 @@ Settings keys (the target set; declared progressively as their consumers land �
 |---|---|---|---|
 | `activationKeyCode` | `Int` | `Constants.defaultActivationKeyCode` (61, Right Option) | `RiverSession` → `HotkeyManager` |
 | `activationMode` | `ActivationMode` | `Constants.defaultActivationMode` (`.hold`) | `RiverSession` → `HotkeyManager` |
-| `customDictionaryTerms` | `[String]` | `Constants.defaultDictionaryTerms` | *no planned consumer — 0008 redesign dropped 2026-07-06 ([0008](../planning/0008_custom-dictionary-redesign.md)); key and prompt plumbing retained in code* |
-| `selectedModel` | `String` | `Constants.defaultModel` | `TranscriptionService` |
+| `customDictionaryTerms` | `[String]` | `Constants.defaultDictionaryTerms` | *none in V1 — key reserved for the dictionary redesign ([0008](../planning/0008_custom-dictionary-redesign.md))* |
+| `selectedModel` | `String` | `Constants.defaultModel` | `RiverSession` → `TranscriptionManager` |
 | `launchAtLogin` | `Bool` | `false` | `SettingsView` → `SMAppService` |
 | `pauseMediaWhileDictating` | `Bool` | `true` | `MediaPauseManager` |
 
-As of M9, `activationKeyCode` (M4), `activationMode` (M9), `customDictionaryTerms`, and `launchAtLogin` are declared. `selectedModel` lands with the model picker, and `pauseMediaWhileDictating` once `MediaPauseManager` exists (deferred — see [../planning/0003_pause-media-while-dictating.md](../planning/0003_pause-media-while-dictating.md)). **`doubleTapWindowMs` is deliberately *not* a setting** — it's an internal `Constants` tunable (above) consumed by `HotkeyManager`'s `TapStateMachine`. The user shouldn't have to reason about a double-tap window, so there is no UI control and no slider; a fixed 400 ms is used always.
+As of M9, `activationKeyCode` (M4), `activationMode` (M9), `customDictionaryTerms`, `launchAtLogin`, and `selectedModel` (the model picker, [0021](../planning/0021_model-picker.md)) are declared. `pauseMediaWhileDictating` lands once `MediaPauseManager` exists (deferred — see [../planning/0003_pause-media-while-dictating.md](../planning/0003_pause-media-while-dictating.md)). **`doubleTapWindowMs` is deliberately *not* a setting** — it's an internal `Constants` tunable (above) consumed by `HotkeyManager`'s `TapStateMachine`. The user shouldn't have to reason about a double-tap window, so there is no UI control and no slider; a fixed 400 ms is used always.
 
 SwiftUI binds via `@AppStorage` using the same key names (see [settings-store.md](settings-store.md) for the rule that prevents drift). Non-SwiftUI consumers read via `store.value(for:)` and observe via `store.publisher(for:)`.
 
@@ -51,7 +51,7 @@ Live-apply is a structural property of [`RiverSession`](river-session.md), not a
 
 ## Not every setting flows through the session
 
-Only **cycle-timing-sensitive** settings (the activation key/mode → `HotkeyManager`) go through `RiverSession`'s apply-or-defer path, because changing them mid-recording would tear down the event tap. Settings that aren't cycle-timed are wired at the app level instead: `launchAtLogin` is handled in the Settings view's `onChange` via `SMAppService`. (`customDictionaryTerms` followed this app-level pattern — `AppDelegate` forwarded it to `TranscriptionService` — until the V1 cut in [0008](../planning/0008_custom-dictionary-redesign.md); the key is declared but currently has no consumer.) The rule: route a setting through the session only if applying it mid-cycle would corrupt the cycle.
+Only **cycle-timing-sensitive** settings go through `RiverSession`'s apply-or-defer path: the activation key/mode → `HotkeyManager` (changing them mid-recording would tear down the event tap) and `selectedModel` → `TranscriptionManager` ([0021](../planning/0021_model-picker.md)) (reloading the model mid-recording would swap `whisperKit` out from under the pending `.processing` transcribe). The model path mirrors the same apply-or-defer contract but omits the tap-mode live branch — a model switch is only ever applied at `.idle`, immediately when idle or on the deferred return to `.idle`; the reload re-enters 0004's load states so the menu bar shows it rather than a false "Ready." Switching leaves the previous model cached (fast switch-back; no in-app cleanup — the Homebrew cask `zap` clears the cache dir). Settings that aren't cycle-timed are wired at the app level instead: `launchAtLogin` is handled in the Settings view's `onChange` via `SMAppService`. (`customDictionaryTerms` followed this app-level pattern — `AppDelegate` forwarded it to `TranscriptionService` — until the V1 cut in [0008](../planning/0008_custom-dictionary-redesign.md); the key is declared but currently has no consumer.) The rule: route a setting through the session only if applying it mid-cycle would corrupt the cycle.
 
 ## Reconfiguration keeps the one running tap
 

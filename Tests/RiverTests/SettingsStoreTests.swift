@@ -43,6 +43,30 @@ struct SettingsStoreTests {
     }
 
     @MainActor
+    @Test("round-trips selectedModel with default")
+    func roundTripsSelectedModel() async throws {
+        let store = makeStore()
+        #expect(store.value(for: Settings.selectedModel) == Constants.defaultModel)
+        store.setValue("openai_whisper-base.en", for: Settings.selectedModel)
+        #expect(store.value(for: Settings.selectedModel) == "openai_whisper-base.en")
+    }
+
+    @MainActor
+    @Test("selectedModel publisher emits only when the value changes")
+    func selectedModelPublisherDedupes() async throws {
+        let store = makeStore()
+        var received: [String] = []
+        let token = store.publisher(for: Settings.selectedModel).sink { received.append($0) }
+        defer { token.cancel() }
+
+        store.setValue("openai_whisper-base.en", for: Settings.selectedModel)
+        store.setValue("openai_whisper-base.en", for: Settings.selectedModel)  // no-op
+        store.setValue("distil-whisper_distil-large-v3", for: Settings.selectedModel)
+
+        #expect(received == [Constants.defaultModel, "openai_whisper-base.en", "distil-whisper_distil-large-v3"])
+    }
+
+    @MainActor
     @Test("round-trips a RawRepresentable enum (ActivationMode) as its raw value")
     func roundTripsActivationMode() async throws {
         let store = makeStore()
@@ -87,6 +111,20 @@ struct SettingsStoreTests {
         defaults.set(99, forKey: Settings.activationKeyCode.name)   // bypasses setValue
         await waitUntil { received.last == 99 }
         #expect(received.last == 99)
+    }
+
+    @MainActor
+    @Test("a stored value that is neither castable nor DefaultsConvertible falls back to the default")
+    func undecodableStoredValueFallsBackToDefault() async throws {
+        // Defensive: if some other process (or a schema change) leaves a value of
+        // the wrong type under a key, `readValue` must return the typed default,
+        // not trap. `activationKeyCode` is an `Int` (not `DefaultsConvertible`), so
+        // a stored `String` is neither directly castable nor decodable — the
+        // last-resort `return key.defaultValue` path.
+        let defaults = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+        defaults.set("not an int", forKey: Settings.activationKeyCode.name)
+        let store = SettingsStore(defaults: defaults)
+        #expect(store.value(for: Settings.activationKeyCode) == Settings.activationKeyCode.defaultValue)
     }
 
     @MainActor
