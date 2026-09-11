@@ -7,17 +7,24 @@ How to get a trustworthy dev build onto this machine and verify a PR against it.
 Run these in order. Each step exists because skipping it has produced a wrong result at least once.
 
 ```bash
-# 1. Refresh the branch with main FIRST (maintainer-run — merges are not automated)
-git -C <worktree> merge origin/main
+# 0. Quit the app if it is running (see below — never rm -rf a live bundle)
 
-# 2. Remove the released cask so it can't shadow the dev build
+# 1. Work from the worktree root, not with `git -C <path>`
+cd ~/Developer/river-stack/<worktree>
+
+# 2. Refresh the branch with main FIRST (maintainer-run — merges are not automated)
+git merge origin/main
+
+# 3. Remove the released cask so it can't shadow the dev build
 brew uninstall --cask river
 
-# 3. Build, bundle, sign, install
+# 4. Build, bundle, sign, install
 make install
 ```
 
-### 1. Refresh before you build — not after
+**Run these from the worktree root.** The `git -C <absolute path> …` form has failed to take effect here in practice; `cd` first, then run the bare command.
+
+### Refresh before you build — not after
 
 A stacked branch is based on its parent, not on `main`. Smoking it un-refreshed tests a base that no longer exists.
 
@@ -29,13 +36,19 @@ This has bitten twice. A `feat/0002-0018-0020` build once pasted `[BLANK_AUDIO]`
 git rev-list --left-right --count origin/main...<branch>
 ```
 
-The left number is how many commits `main` has that the branch doesn't. It must be `0` before an on-device smoke means anything.
+The left number is how many commits `main` has that the branch doesn't. It must be `0` before an on-device smoke means anything. The right number — commits the branch has that `main` doesn't — is just the branch's own work and is expected to be non-zero.
 
-### 2. Clean slate before install
+**Verify the branch you will actually build from**, which is not necessarily the one you reviewed in. In a stacked review it is normal to read a *combined* diff from the upper worktree (so the lower PR's commits appear on a current base) while the lower PR's own branch sits far behind. Refreshing one worktree does nothing for its sibling. This bit us on #31: the review happened in a clean g10 while g09 — the branch that would actually be built and merged — was 18 commits behind.
+
+### Quit the app before installing
+
+`make install` does `rm -rf` on `/Applications/River.app`. Doing that to a running app deletes the bundle out from under a live process, and since the silent-no-op detector keys off bundle identity, that is a good way to manufacture a confusing false negative that looks like a permissions regression.
+
+### Clean slate before install
 
 If the Homebrew cask is installed, `/Applications/River.app` belongs to it. Removing it first eliminates any ambiguity about which binary is running and which bundle holds the TCC grants. Cheap step; do it first rather than debugging a shadowed build later.
 
-### 3. Expect one permission round-trip per rebuild
+### Expect one permission round-trip per rebuild
 
 Each `make install` re-signs with the self-signed "River Dev" identity, so macOS treats the bundle as a changed binary. Accessibility typically needs one Grant → Refresh round-trip before the app's own launch-time read reports `.granted`. The TCC row survives; the app-side read is the false negative. This is what planning 0012 (PR #33) addresses — until it lands, treat one round-trip as expected, not as a regression.
 
