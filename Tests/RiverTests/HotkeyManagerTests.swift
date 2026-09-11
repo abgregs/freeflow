@@ -111,6 +111,118 @@ struct HotkeyManagerHoldTests {
     }
 }
 
+@Suite("HotkeyManager cancel gesture")
+struct HotkeyManagerCancelTests {
+    // The cancel modifier (planning 0017) is interpreted off the same watched
+    // `.flagsChanged` stream — no mask widening, no keyDown observation, so the
+    // 0006 least-privilege posture is untouched. It fires on the press edge and is
+    // independent of activation mode.
+
+    @MainActor
+    @Test("cancel key press fires onCancel once, on the down edge")
+    func cancelKeyFiresOnPress() {
+        let manager = makeManager(mode: .hold, cancelKeyCode: 63)
+        var cancels = 0
+        manager.onCancel = { cancels += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 63, flags: .maskSecondaryFn))  // press
+        #expect(cancels == 1)
+        manager.handle(.flagsChanged(keyCode: 63, flags: []))                // release: no re-fire
+        #expect(cancels == 1)
+        manager.handle(.flagsChanged(keyCode: 63, flags: .maskSecondaryFn))  // second press
+        #expect(cancels == 2)
+    }
+
+    @MainActor
+    @Test("the cancel key does not disturb activation callbacks")
+    func cancelKeyDoesNotActivate() {
+        let manager = makeManager(mode: .hold, cancelKeyCode: 63)
+        var activates = 0
+        var deactivates = 0
+        var cancels = 0
+        manager.onActivate = { activates += 1 }
+        manager.onDeactivate = { deactivates += 1 }
+        manager.onCancel = { cancels += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 63, flags: .maskSecondaryFn))  // cancel press
+        manager.handle(.flagsChanged(keyCode: 63, flags: []))                // cancel release
+        #expect(cancels == 1)
+        #expect(activates == 0)   // activation latch untouched
+        #expect(deactivates == 0)
+
+        // The watched key still starts a recording normally afterward.
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))
+        #expect(activates == 1)
+    }
+
+    @MainActor
+    @Test("cancel is disabled when it would collide with the activation key")
+    func cancelDisabledWhenEqualsActivationKey() {
+        // If the cancel keycode equals the watched key, that key already means
+        // start/stop; the gesture disables so it isn't ambiguous. Watched == cancel
+        // == 62 → the event drives activation (Hold), never onCancel.
+        let manager = makeManager(mode: .hold, cancelKeyCode: 62)
+        var activates = 0
+        var cancels = 0
+        manager.onActivate = { activates += 1 }
+        manager.onCancel = { cancels += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))
+        #expect(cancels == 0)
+        #expect(activates == 1)   // treated as an activation, not a cancel
+    }
+
+    @MainActor
+    @Test("Hold: cancelling mid-hold leaves the press latch intact")
+    func holdCancelPreservesPressLatch() {
+        // The Hold half of the cancel-reset asymmetry (planning 0017). Hold tracks
+        // the PHYSICAL key: during a cancel the activation key is still held down,
+        // so the eventual release must read as a release. If `resetTapState` ever
+        // also cleared `isKeyDown`, that release would toggle the latch to "down"
+        // and fire a PHANTOM ACTIVATE — starting a recording as the user lifts off
+        // the key. This test fails the moment that happens.
+        let manager = makeManager(mode: .hold, cancelKeyCode: 63)
+        var activates = 0
+        var deactivates = 0
+        manager.onActivate = { activates += 1 }
+        manager.onDeactivate = { deactivates += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))       // hold down → start
+        #expect(activates == 1)
+
+        manager.handle(.flagsChanged(keyCode: 63, flags: .maskSecondaryFn))   // fn while still held
+        manager.resetTapState()                                               // what handleCancel does
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: []))                 // release the held key
+        #expect(deactivates == 1)   // a genuine release edge...
+        #expect(activates == 1)     // ...not a phantom press
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))       // next press
+        #expect(activates == 2)     // starts normally — no swallowed keypress
+    }
+
+    @MainActor
+    @Test("cancel works identically in a tap mode")
+    func cancelWorksInTapMode() {
+        let manager = makeManager(mode: .singleTap, cancelKeyCode: 63)
+        var cancels = 0
+        manager.onCancel = { cancels += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 63, flags: .maskSecondaryFn))
+        #expect(cancels == 1)
+    }
+
+    @MainActor
+    private func makeManager(mode: ActivationMode, cancelKeyCode: Int) -> HotkeyManager {
+        HotkeyManager(
+            inputMonitoring: InputMonitoringCapability(),
+            initialKeyCode: 62,
+            initialMode: mode,
+            cancelKeyCode: cancelKeyCode
+        )
+    }
+}
+
 @Suite("HotkeyManager tap modes")
 struct HotkeyManagerTapTests {
     // Tap modes act only on the completing (key-up) edge of a tap and route
@@ -205,6 +317,50 @@ struct HotkeyManagerTapTests {
 
         tap(manager)  // a clean tap on the new mode starts a recording
         #expect(activates == 2)
+    }
+
+    @MainActor
+    @Test("single tap: after resetTapState the next tap starts, it is not eaten as a stop")
+    func singleTapAfterResetStarts() {
+        // Planning 0017 field bug: cancel ends the recording through the session,
+        // not through a tap, so without the reset the tap machine stays in
+        // `.recording` and the user's next tap is consumed as a `stop` for a
+        // recording that no longer exists — they must press twice to start again.
+        let manager = makeManager(mode: .singleTap)
+        var activates = 0
+        var deactivates = 0
+        manager.onActivate = { activates += 1 }
+        manager.onDeactivate = { deactivates += 1 }
+
+        tap(manager)                 // start
+        #expect(activates == 1)
+
+        manager.resetTapState()      // stands in for the cancel path
+
+        tap(manager)                 // must START, not stop
+        #expect(activates == 2)
+        #expect(deactivates == 0)
+    }
+
+    @MainActor
+    @Test("double tap: after resetTapState two quick taps start a fresh recording")
+    func doubleTapAfterResetStarts() {
+        let manager = makeManager(mode: .doubleTap)
+        var activates = 0
+        var deactivates = 0
+        manager.onActivate = { activates += 1 }
+        manager.onDeactivate = { deactivates += 1 }
+
+        tap(manager)
+        tap(manager)                 // two quick taps → start
+        #expect(activates == 1)
+
+        manager.resetTapState()      // stands in for the cancel path
+
+        tap(manager)
+        tap(manager)                 // two quick taps → start again
+        #expect(activates == 2)
+        #expect(deactivates == 0)
     }
 
     @MainActor

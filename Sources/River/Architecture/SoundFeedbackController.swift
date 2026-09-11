@@ -2,10 +2,11 @@ import AppKit
 import Foundation
 
 /// Which audible cue to play. Begin fires on `.idle → .recording`;
-/// end fires on `.recording → .processing`.
+/// end fires on `.recording → .processing`; cancel fires on `.recording → .idle`.
 enum SoundCue: Equatable {
     case begin
     case end
+    case cancel
 }
 
 /// Plays a `SoundCue`. Injected so tests replace the real OS call with a recording fake.
@@ -20,8 +21,11 @@ final class NSSoundPlayer: SoundFeedbackPlaying {
     func play(_ cue: SoundCue) {
         let name: NSSound.Name
         switch cue {
-        case .begin: name = NSSound.Name("Tink")
-        case .end:   name = NSSound.Name("Funk")
+        case .begin:  name = NSSound.Name("Tink")
+        case .end:    name = NSSound.Name("Funk")
+        // Provisional. Chosen only for being clearly distinguishable from the
+        // other two by timbre — the palette is revisited in the UI/identity pass.
+        case .cancel: name = NSSound.Name("Bottle")
         }
         NSSound(named: name)?.play()
     }
@@ -82,6 +86,15 @@ final class SoundFeedbackController {
         switch (from, to) {
         case (.idle, .recording):       return .begin
         case (.recording, .processing): return .end
+        // A canceled recording (planning 0017) transitions `.recording → .idle`
+        // directly, never through `.processing`. It gets its OWN cue rather than
+        // the end cue — the end cue means "speech captured, now transcribing,"
+        // which a discard is not — and rather than silence, because 0016 exists
+        // for the moment the user's eyes are on the text field rather than the
+        // HUD, which is exactly when a discard needs confirming. The menu/HUD
+        // "Recording canceled." notice remains; this is additive, not a
+        // replacement.
+        case (.recording, .idle):       return .cancel
         default:                        return nil
         }
     }
