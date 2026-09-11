@@ -252,6 +252,10 @@ final class FreeFlowSession {
         logger.info("Cancel: discarding in-flight recording (no transcription, no paste)")
         let audio = self.audio
         Task { @MainActor in await audio.discardRecording() }
+        // The recording ended without a tap, so the tap machine still believes one
+        // is in flight. Clear it or the user's next tap is consumed as a `stop` for
+        // the discarded recording and a second tap is needed to start a new one.
+        hotkey.resetTapState()
         stateSubject.send(.idle)
         logger.info("State -> idle (canceled)")
         noticeSubject.send(ActivationNotice.recordingCanceled)
