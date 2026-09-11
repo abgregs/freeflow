@@ -9,4 +9,5 @@ How code is written in Free Flow. Read what's relevant before changing code in t
 - [git.md](git.md) — branches, conventional commits, stacked PRs, what touches `main`
 - [doc-maintenance.md](doc-maintenance.md) — the automated doc-sync routine's spec: how `docs/` stays synced with the code, the confidence rubric, and the PR lifecycle
 - [versioning-and-releases.md](versioning-and-releases.md) — tag-driven release protocol, SemVer rules, the two macOS version fields, per-channel update behavior
+- [local-builds.md](local-builds.md) — getting a trustworthy dev build installed and smoke-tested; why "Loading model…" is a build step, not a download
 - [anti-patterns.md](anti-patterns.md) — explicit "do not do this," with the why
