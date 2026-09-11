@@ -31,7 +31,6 @@ struct TextInsertionChunkTests {
         // must land in separate chunks rather than splitting the second's pair.
         let chunks = TextInsertionManager.chunk("👍👍", maxUnits: 3)
         #expect(chunks == ["👍", "👍"])
-        #expect(chunks.allSatisfy { $0.unicodeScalars.allSatisfy { _ in true } })
     }
 
     @MainActor

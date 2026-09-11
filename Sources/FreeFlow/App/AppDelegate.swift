@@ -11,7 +11,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let microphone = MicrophoneCapability()
     let inputMonitoring = InputMonitoringCapability()
     let settings = SettingsStore()
-    let transcription = TranscriptionService()
+    // Lazy so the manager loads the persisted `selectedModel` (planning 0021) at
+    // launch, not the compile-time default — otherwise a user who picked a different
+    // model would load `small.en` first and immediately reload on the startup
+    // subscription emission. `settings` is a stored property, so this must be lazy to
+    // read it during construction.
+    private(set) lazy var transcription = TranscriptionManager(
+        modelName: settings.value(for: Settings.selectedModel)
+    )
     let appState = AppState()
 
     private(set) lazy var session: FreeFlowSession = {
@@ -37,10 +44,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         OnboardingCoordinator(capabilities: capabilities)
     }()
 
+    private(set) lazy var recordingIndicator: RecordingIndicatorCoordinator = {
+        RecordingIndicatorCoordinator(appState: appState)
+    }()
+
+    private(set) lazy var soundFeedback: SoundFeedbackController = {
+        SoundFeedbackController(appState: appState, settings: settings)
+    }()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Application did finish launching")
         appState.bind(to: session)
+        appState.bind(transcription: transcription)
+        appState.bind(microphone: microphone)
         onboarding.start()
+        recordingIndicator.start()
+        soundFeedback.start()
         Task { @MainActor in
             do { try await session.start() }
             catch { logger.error("Failed to start session: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)") }
