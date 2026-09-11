@@ -10,6 +10,10 @@ Authoritative project context lives in [`docs/`](docs/_index.md). Read `docs/_in
 
 **After any non-trivial code change:** doc updates alongside your change are welcome, not required — doc/code drift is caught by the maintainer's automated doc sync ([docs/conventions/doc-maintenance.md](docs/conventions/doc-maintenance.md)).
 
+## Git: merges are maintainer-only
+
+**Never run `git merge` (any form — including merging `main` into a feature branch) or `gh pr merge`.** Merges are the maintainer's sign-off points and are deny-listed in agent settings; do everything up to the merge (commits, pushes, PR bodies, `gh pr create`/`gh pr edit`, base retargeting), then hand the maintainer the exact single-line merge command and continue after he runs it. Pushing is allowed: push feature branches and open PRs against any base (including a parent branch for stacked PRs). `main` cannot be pushed directly by anyone — the "Protect main branch" GitHub ruleset requires changes to arrive via PR merge and blocks force-pushes and deletion; the maintainer's bypass applies to PR merges only. See [docs/conventions/git.md](docs/conventions/git.md) "Maintainer-only git operations".
+
 ## Build & run
 
 ```bash
