@@ -56,9 +56,11 @@ struct TranscriptionEvalTests {
             } else {
                 do {
                     output = try await manager.transcribe(audioSamples: trimmed)
-                } catch TranscriptionError.emptyTranscription {
-                    // The no-speech gate (planning 0023) firing is the honest
-                    // "empty output" result for this eval, not a harness failure.
+                } catch TranscriptionError.emptyTranscription, TranscriptionError.noSpeechDetected {
+                    // Either no-speech outcome (planning 0023) — a truly empty
+                    // decode, or annotation-only output ("[BLANK_AUDIO]") that
+                    // classifies as `.noSpeechDetected` — is the honest "empty
+                    // output" result for this eval, not a harness failure.
                     output = ""
                 }
             }
@@ -77,8 +79,14 @@ struct TranscriptionEvalTests {
         )
 
         let outPath = env["FREEFLOW_EVAL_OUT"] ?? "eval-\(model).txt"
-        try? card.write(toFile: outPath, atomically: true, encoding: .utf8)
-        print("\n\(card)\n→ also written to \(FileManager.default.currentDirectoryPath)/\(outPath)\n")
+        // Print before writing so the card survives on the console even if the
+        // write fails — but a failed write still fails the run (a scorecard that
+        // silently never landed on disk would violate AC2).
+        let printedPath = outPath.hasPrefix("/")
+            ? outPath
+            : "\(FileManager.default.currentDirectoryPath)/\(outPath)"
+        print("\n\(card)\n→ also written to \(printedPath)\n")
+        try card.write(toFile: outPath, atomically: true, encoding: .utf8)
 
         // A silence-tagged clip that produced text is a real regression (0023) —
         // fail the run loudly rather than let a green harness hide it.
