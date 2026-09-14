@@ -524,6 +524,46 @@ struct RiverSessionTests {
     }
 
     @MainActor
+    @Test("a known-denied capability declines activation before any audio is captured")
+    func deniedCapabilityDeclinesActivation() async throws {
+        // Planning 0012 AC5. The field log recorded a 35-second dictation accepted
+        // while Accessibility was denied — audio that could only die at paste time,
+        // with the user's speech already gone. The gate must refuse up front.
+        let env = makeSession()
+        try await env.session.start()
+        env.accessibility.setStatusForTesting(.denied)
+
+        var errors: [RiverError] = []
+        let token = env.session.errors.sink { errors.append($0) }
+        defer { token.cancel() }
+
+        env.session.handleActivate()
+
+        #expect(env.session.currentState == .idle)   // never entered .recording
+        #expect(errors.count == 1)
+        if case .permission(let capability) = errors.first {
+            #expect(capability == env.accessibility.displayName)
+        } else {
+            Issue.record("expected a .permission error, got \(String(describing: errors.first))")
+        }
+    }
+
+    @MainActor
+    @Test("an unknown capability status does not block activation")
+    func unknownCapabilityStatusFailsOpen() async throws {
+        // Fail-open, matching the insertion guard (planning 0001): an uncertain
+        // reading must never be the thing that stops a dictation. Only `.denied`
+        // blocks — a capability that has not been probed yet reads `.unknown`.
+        let env = makeSession()
+        try await env.session.start()
+        env.accessibility.setStatusForTesting(.unknown)
+
+        env.session.handleActivate()
+
+        #expect(env.session.currentState == .recording)
+    }
+
+    @MainActor
     private struct TestEnv {
         let session: RiverSession
         let store: SettingsStore
@@ -537,6 +577,13 @@ struct RiverSessionTests {
     @MainActor
     private func makeSession() -> TestEnv {
         let accessibility = AccessibilityCapability()
+        // The test process is not Accessibility-trusted, so this capability would
+        // otherwise read `.denied` and the 0012 AC5 activation gate would refuse
+        // every cycle test. Grant it explicitly; the two gate tests override it.
+        accessibility.setStatusForTesting(.granted)
+        // Granting it also unlocks the real `CGEvent.post` path, which must stay
+        // stubbed in tests — the suite has no Accessibility grant to post with.
+        accessibility.skipPostForTesting = true
         let microphone = MicrophoneCapability()
         microphone.skipEngineForTesting = true
         let inputMonitoring = InputMonitoringCapability()
@@ -646,7 +693,12 @@ struct RiverSessionTests {
         // when the paste throws.
         let env = makeSession()
         env.transcription.transcribeResultForTesting = "hello world"
-        env.accessibility.setStatusForTesting(.denied)   // postKeyEvent will throw
+        // Force the failure through the insertion guard rather than by denying the
+        // capability: since the 0012 AC5 gate, a denied Accessibility refuses
+        // activation outright, so "recording completes, then the paste fails" is no
+        // longer reachable that way. A non-editable focus target is — and it is the
+        // paste failure that still happens in the field.
+        env.accessibility.focusedTargetForTesting = .nonEditable
 
         var errors: [RiverError] = []
         let token = env.session.errors.sink { errors.append($0) }
