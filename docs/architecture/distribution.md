@@ -17,7 +17,17 @@ The App Store is intentionally not a channel. **Why:** the sandbox forbids globa
 | **River Dev** | Local installs via Makefile | Self-signed certificate in user's login keychain | Persistent across rebuilds on a developer machine |
 | **Developer ID Application** | DMG releases and Homebrew cask | Apple Developer Program ($99/yr) | Tied to the Apple developer account |
 
-Local builds always use River Dev. **Why:** ad-hoc signing produces a new code-directory hash on every build, which invalidates TCC entries (Accessibility / Input Monitoring), forcing the user to re-grant permissions every rebuild. A persistent local identity keeps the same hash, so TCC grants stick.
+Local builds always use River Dev. **Why:** ad-hoc signing produces a new code-directory hash on every build, which invalidates TCC entries (Accessibility / Input Monitoring), forcing the user to re-grant permissions every rebuild. A persistent local identity is *supposed* to keep grants stable across rebuilds — but see the correction below: that only holds for grants the app *requested*; it does **not** hold for rows added manually in System Settings, which is currently the only way Accessibility can be granted at all.
+
+## Permissions across installs and rebuilds (field-corrected 2026-08-18)
+
+The previous revision of this doc claimed TCC grants stick across rebuilds under the persistent identity. On-device experience during the 0004/0021/0002 smoke falsified that for Accessibility. The corrected model:
+
+- **Rows created by tccd via a request API survive rebuilds.** Microphone (granted through the native `AVCaptureDevice.requestAccess` prompt) carried across a `make install` rebuild untouched. tccd records these against the signing identity, which the persistent cert keeps stable.
+- **Pane-added Accessibility rows survive same-identity rebuilds too — but the app *reads* denied at launch.** Repeated rebuilds (2026-08-19) showed the lighter recovery works every time: Grant (Settings shows the row already on) → back → Refresh → granted. No reset, no re-add. So the row persists; the launch-time "not granted" is the app's own status read — most plausibly the 0012 item-1 probe race (a fresh binary's first probe false-negatives before TCC state settles). 0012's retry-with-settle plus a post-Grant auto-recheck should make same-identity rebuilds zero-touch. Until it lands: after each `make install`, expect one Grant-roundtrip + Refresh in onboarding.
+- **Genuinely stale rows are the heavy case.** A row created against a *different* identity (the Homebrew-era build, or any identity churn) shows enabled in Settings while tccd refuses the running binary, and Refresh never helps. Recovery: quit → `tccutil reset Accessibility com.river.app` → re-add fresh via **+** → relaunch. Toggling the stale row is a no-op.
+- **The structural fix is 0012** ([planning/0012](../planning/0012_onboarding-permissions-polish.md)): call the request APIs so tccd owns durable rows for Accessibility and Input Monitoring the same way it does for Microphone.
+- **Release-channel users are on the durable path.** Developer ID + notarized builds keep one stable identity across upgrades (cask reinstall, Sparkle updates), so end users don't ride this edge. The one hard rule: never install a differently-signed build *over* a cask-owned app — uninstall the cask first (the 2026-08-14 lesson), or grants break with the same Settings-says-granted confusion.
 
 Release builds use Developer ID. **Why:** macOS Gatekeeper warns sharply on Developer ID-unsigned downloads; for an app that asks for Accessibility this kills trust. Developer ID + notarization makes the app a first-class macOS citizen.
 
