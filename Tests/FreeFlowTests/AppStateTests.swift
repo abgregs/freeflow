@@ -196,6 +196,12 @@ struct AppStateTests {
     @MainActor
     private func makeBoundEnv() -> BoundEnv {
         let accessibility = AccessibilityCapability()
+        // Not Accessibility-trusted in a test process, so grant it explicitly or the
+        // 0012 AC5 activation gate refuses the cycle this test drives end to end.
+        accessibility.setStatusForTesting(.granted)
+        // Granting it also unlocks the real `CGEvent.post` path, which must stay
+        // stubbed in tests — the suite has no Accessibility grant to post with.
+        accessibility.skipPostForTesting = true
         let microphone = MicrophoneCapability()
         microphone.skipEngineForTesting = true
         let inputMonitoring = InputMonitoringCapability()
