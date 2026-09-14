@@ -63,12 +63,14 @@ That Refresh press has no downside and no judgment in it. Its only trigger is th
 
 **Target behavior:**
 
-- **Recheck before deciding to present.** Run the #33 settle retry at launch before consulting the gate. A user whose permissions are all valid never sees onboarding.
+- **Settle the trust read before deciding to present.** Retry `AXIsProcessTrusted()` itself briefly at launch before consulting the gate. A user whose permissions are all valid never sees onboarding.
 - **Recheck automatically when it could have changed** — on app activation and on onboarding window focus, which is exactly when a user returns from granting.
 - **Dismiss onboarding the moment every capability reads granted**, so the user goes straight to dictating.
 - **The Refresh button becomes redundant.** Decide during implementation whether to remove it or keep it as a demoted fallback; either way it must stop being a required step.
 
-**Ordering dependency:** #33's probe retry-with-settle is a prerequisite, not an alternative. Auto-rechecking *without* settle would just surface the same false negative automatically — faster, but still wrong.
+**Which read is actually wrong — corrected by the #33 smoke (2026-09-14).** There are two status reads, and #33's retry only covers one. At launch, `init()` reads `AXIsProcessTrusted()` alone — no probe. On Refresh, `recheck()` reads `AXIsProcessTrusted()` and runs the probe *only if it returned trusted*; #33's retry wraps that probe. On-device, a rebuilt binary showed **no change with #33**: launch still reads not-granted, and a single Refresh flips it green, exactly as before. That places the false negative on the launch-time `AXIsProcessTrusted()` read — it is false on a fresh binary and true moments later — not on the probe, which passes first time once trust reads true. So the retry never engages in this flow.
+
+Consequence for the design: settling must wrap the **trust read**, not just the probe. Auto-rechecking with only #33's probe retry would reproduce the same launch false negative automatically. #33's retry remains a reasonable backstop for the trusted-but-probe-lags case, but it is not the mechanism that removes this friction.
 
 **What auto-recheck cannot fix:** the stale row (section 4). There, "denied" is the *correct* reading — tccd genuinely does not authorize the running binary — so no amount of rechecking helps, and AC6's recovery guidance is still required. Zero-touch removes the friction from the case where the app was simply wrong about the state; it does not replace guidance for the case where the state is genuinely broken.
 
