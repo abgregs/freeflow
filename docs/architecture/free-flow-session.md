@@ -31,7 +31,7 @@ That's it. There is no `reconfigure(...)` method. The `errors` publisher emits a
 ## What the session does not own
 
 - The CGEventTap thread. That's owned by [`InputMonitoringCapability`](capabilities.md), which `HotkeyManager` builds on.
-- Whisper model loading. That's owned by `TranscriptionService` and happens on its own schedule.
+- Whisper model loading. That's owned by `TranscriptionManager` and happens on its own schedule.
 - Settings storage. That's owned by [`SettingsStore`](settings-store.md). The session subscribes; it does not persist.
 - UI. The session imports no SwiftUI. The menu bar observes `state` and `errors` through the [`AppState`](app-state-and-menu-bar.md) bridge; the session never reaches into the UI.
 

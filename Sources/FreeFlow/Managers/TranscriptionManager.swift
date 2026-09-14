@@ -31,6 +31,13 @@ enum TranscriptionError: Error, LocalizedError {
     /// the no-audio path (`AudioCaptureError.noAudioCaptured` in M5) so the
     /// log shows *what* failed.
     case emptyTranscription
+    /// Decode produced only non-speech annotations (`[BLANK_AUDIO]`, `(heavy
+    /// breathing)`, …): Whisper heard the audio but found no words in it. The
+    /// session treats this like the all-silence trim case — quiet no-op, not a
+    /// failure (planning 0023). Kept distinct from `.emptyTranscription` so the
+    /// 0002/0018/0020 feedback surface can later explain "nothing was pasted"
+    /// without conflating it with a real decode failure.
+    case noSpeechDetected
 
     var errorDescription: String? {
         switch self {
@@ -40,6 +47,8 @@ enum TranscriptionError: Error, LocalizedError {
             return "Transcription failed: \(underlying.localizedDescription)"
         case .emptyTranscription:
             return "Transcription returned no text."
+        case .noSpeechDetected:
+            return "No speech was detected in the recording."
         }
     }
 }
@@ -135,16 +144,21 @@ final class TranscriptionManager {
         logger.info("Loading WhisperKit model \(self.modelName, privacy: .public)")
         let downloadBase = Self.modelDownloadBase()
         let modelName = self.modelName
-        let subject = loadStateSubject  // capture reference; task updates state mid-flight
 
-        let task = Task<WhisperKit, Error> {
+        let task = Task<WhisperKit, Error> { [weak self] in
             // Download under Application Support (planning 0010).
             try FileManager.default.createDirectory(at: downloadBase, withIntermediateDirectories: true)
             // Phase 1: download or find cached model files. `load: false` skips the
             // in-memory load so we can emit the `.loading` transition before it.
             let wk = try await WhisperKit(model: modelName, downloadBase: downloadBase, load: false)
-            // Phase 2: files confirmed on disk — now loading CoreML models into memory.
-            subject.send(.loading)
+            // Phase 2: files confirmed on disk — now loading CoreML models into
+            // memory. Generation-guarded like the completion paths: a superseded
+            // load finishing its download must not mislabel the *newer* switch's
+            // published state (e.g. flip "Downloading model…" to "Loading…" while
+            // another model's download is what the user is actually waiting on).
+            if let self, self.loadGeneration == generation {
+                self.emitLoadState(.loading)
+            }
             try await wk.loadModels()
             return wk
         }
@@ -155,16 +169,24 @@ final class TranscriptionManager {
             // `switchModel` owns `whisperKit`/state now, so drop this stale result.
             guard generation == loadGeneration else { return }
             whisperKit = wk
-            loadStateSubject.send(.ready)
+            emitLoadState(.ready)
             logger.info("WhisperKit model loaded")
         } catch {
             // Don't overwrite a newer switch's state with this superseded failure.
             guard generation == loadGeneration else { throw error }
             loadTask = nil
-            loadStateSubject.send(.failed)
+            emitLoadState(.failed)
             logger.error("WhisperKit load failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
             throw error
         }
+    }
+
+    // Every runtime load-state transition goes through here so on-device incidents
+    // (e.g. "the HUD hid while a model was still loading") leave a trace of exactly
+    // which state fired and when. State names only — no user content (logging.md).
+    private func emitLoadState(_ state: ModelLoadState) {
+        logger.info("Model load state -> \(String(describing: state), privacy: .public)")
+        loadStateSubject.send(state)
     }
 
     // internal for testability — the model picker's current selection, so session
@@ -187,7 +209,7 @@ final class TranscriptionManager {
         loadTask?.cancel()
         loadTask = nil
         let isCached = Self.isModelCached(downloadBase: Self.modelDownloadBase(), modelName: newModelName)
-        loadStateSubject.send(isCached ? .loading : .downloading)
+        emitLoadState(isCached ? .loading : .downloading)
         return true
     }
 
@@ -253,20 +275,42 @@ final class TranscriptionManager {
     // conditioned on a prompt; without the retry, adding a dictionary term could
     // turn a working dictation into a hard `.emptyTranscription` — strictly worse
     // than no dictionary (requirements/custom-dictionary.md). Retry unprompted so
-    // the dictionary degrades to neutral. A genuinely silent recording still
-    // errors honestly (the retry is also empty). Logged so prompt-quality
-    // regressions stay observable.
+    // the dictionary degrades to neutral. Annotation-only output ("[BLANK_AUDIO]")
+    // counts as no-speech for the retry, and classifies as `.noSpeechDetected`
+    // at the end (vs `.emptyTranscription` for a truly empty decode — the session
+    // treats the former as a quiet no-op and the latter as a loud failure).
+    // Logged so prompt-quality regressions stay observable.
     func resolveWithEmptyPromptRetry(
         promptTokens: [Int],
         decode: (_ promptTokens: [Int]) async throws -> String
     ) async throws -> String {
         var text = try await decode(promptTokens)
-        if text.isEmpty, !promptTokens.isEmpty {
-            logger.warning("Prompted transcription was empty; retrying without the custom-dictionary prompt")
+        if text.isEmpty || Self.isNonSpeechAnnotation(text), !promptTokens.isEmpty {
+            logger.warning("Prompted transcription had no speech; retrying without the custom-dictionary prompt")
             text = try await decode([])
         }
         guard !text.isEmpty else { throw TranscriptionError.emptyTranscription }
+        guard !Self.isNonSpeechAnnotation(text) else { throw TranscriptionError.noSpeechDetected }
         return text
+    }
+
+    // internal for testability — true when decoded text consists *only* of
+    // Whisper's non-speech annotations: bracketed or parenthesized labels like
+    // "[BLANK_AUDIO]", "[MUSIC]", "(heavy breathing)", plus any leftover
+    // punctuation. The decode gates (`noSpeechThreshold` etc.) do not reliably
+    // suppress these — probed on-device with real quiet-room/breath/keyboard
+    // clips (planning 0023) — so without this check they paste as literal text.
+    // Whole-output classification only: mixed annotation+speech output is left
+    // untouched, so dictation that legitimately contains brackets never loses
+    // content.
+    static func isNonSpeechAnnotation(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let stripped = trimmed
+            .replacingOccurrences(of: #"\[[^\[\]]*\]"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\([^()]*\)"#, with: "", options: .regularExpression)
+        guard stripped != trimmed else { return false }  // no annotation present at all
+        return stripped.allSatisfy { $0.isPunctuation || $0.isWhitespace }
     }
 
     private func decode(_ audioSamples: [Float], promptTokens: [Int], using whisperKit: WhisperKit) async throws -> String {
