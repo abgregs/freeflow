@@ -22,7 +22,26 @@ enum ErrorToastPresentation {
                 headline: "Couldn't capture audio",
                 hint: "Check that a microphone is connected and not muted, then try again."
             )
-        case .transcription:
+        case .permission(let capability):
+            // Nothing failed — the recording was declined before it started
+            // (planning 0012 AC5). The hint must point at the fix, since the user
+            // is holding a key expecting to dictate and nothing happened.
+            return ErrorToast(
+                headline: "\(capability) permission needed",
+                hint: "Open Permissions… from the menu bar to grant it, then try again."
+            )
+        case .transcription(let underlying):
+            // The most common "transcription error" is no failure at all: the user
+            // dictated before the model was warm (the 0004 activation gate). The
+            // generic speak-louder hint would misdirect there — say what is
+            // actually happening and what unblocks it.
+            if let transcriptionError = underlying as? TranscriptionError,
+               case .modelNotLoaded = transcriptionError {
+                return ErrorToast(
+                    headline: "Model still loading",
+                    hint: "Dictation unlocks as soon as the model finishes loading."
+                )
+            }
             return ErrorToast(
                 headline: "Couldn't transcribe",
                 hint: "No text was produced. Speak a little louder or check your input device."

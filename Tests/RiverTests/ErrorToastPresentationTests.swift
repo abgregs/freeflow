@@ -16,6 +16,7 @@ struct ErrorToastPresentationTests {
             .audioCapture(underlying: dummy),
             .transcription(underlying: dummy),
             .textInsertion(underlying: dummy),
+            .permission(capability: "Accessibility"),
         ]
         for error in errors {
             let toast = ErrorToastPresentation.toast(for: error)
@@ -34,6 +35,24 @@ struct ErrorToastPresentationTests {
         let transcribe = ErrorToastPresentation.toast(for: .transcription(underlying: dummy)).headline
         let paste = ErrorToastPresentation.toast(for: .textInsertion(underlying: dummy)).headline
         #expect(Set([audio, transcribe, paste]).count == 3)
+    }
+
+    @Test("a model-not-ready decline gets its own honest copy, not the speak-louder hint")
+    func modelNotLoadedGetsLoadingCopy() {
+        // The 0004 activation gate emits .transcription(modelNotLoaded) every time
+        // the user dictates before the model is warm — the most common toast a new
+        // user sees. Generic speak-louder advice would misdirect (their speech was
+        // fine; the model wasn't ready), so this sub-case must diverge from the
+        // real decode-failure copy and must not blame the audio.
+        let gateDecline = ErrorToastPresentation.toast(
+            for: .transcription(underlying: TranscriptionError.modelNotLoaded)
+        )
+        let decodeFailure = ErrorToastPresentation.toast(
+            for: .transcription(underlying: NSError(domain: "x", code: 1))
+        )
+        #expect(gateDecline != decodeFailure)
+        #expect(gateDecline.headline.localizedCaseInsensitiveContains("loading"))
+        #expect(!gateDecline.hint.localizedCaseInsensitiveContains("speak"))
     }
 
     @Test("toast copy carries no user content from the underlying error")
