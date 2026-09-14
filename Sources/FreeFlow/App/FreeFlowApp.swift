@@ -7,11 +7,12 @@ struct FreeFlowApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarContent(appState: appDelegate.appState, cancel: {
-                appDelegate.session.handleCancel()
-            }, copyLastTranscript: {
-                appDelegate.session.copyLastTranscript()
-            })
+            MenuBarContent(
+                appState: appDelegate.appState,
+                cancel: { appDelegate.session.handleCancel() },
+                copyLastTranscript: { appDelegate.session.copyLastTranscript() },
+                openPermissions: { appDelegate.onboarding.forcePresent() }
+            )
         } label: {
             MenuBarLabel(appState: appDelegate.appState)
         }
@@ -43,6 +44,10 @@ private struct MenuBarContent: View {
     /// Writes the last retained transcript to the clipboard (planning 0019).
     /// User-initiated write — the automated cycle never touches the clipboard.
     let copyLastTranscript: () -> Void
+    /// Re-opens the permissions window on demand (planning 0012). Wired to
+    /// `OnboardingCoordinator.forcePresent()` so users can inspect or refresh
+    /// their grants at any time without relaunching.
+    let openPermissions: () -> Void
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -70,6 +75,7 @@ private struct MenuBarContent: View {
         Button("Copy Last Transcription", action: copyLastTranscript)
             .disabled(!appState.hasLastTranscript)
         Divider()
+        Button("Permissions…", action: openPermissions)
         Button("Settings…") {
             NSApp.activate(ignoringOtherApps: true)
             openSettings()

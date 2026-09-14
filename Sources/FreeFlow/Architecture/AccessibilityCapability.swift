@@ -95,18 +95,51 @@ final class AccessibilityCapability: Capability {
                 update(.granted)
                 return
             }
-            let delivered = probe()
+            // Retry the probe a few times with a short settle delay: a freshly-
+            // granted Accessibility permission often isn't reflected on the first
+            // check because macOS doesn't push TCC grants to an already-running
+            // process. A persistent failure — all retries exhausted — still
+            // downgrades to .denied, preserving the bundle-misidentification
+            // detector (anti-pattern #3). Only the transient just-granted case
+            // is forgiven.
+            let delivered = await Self.probeWithSettle(
+                maxRetries: Constants.accessibilityProbeRetryCount,
+                delayNs: UInt64(Constants.accessibilityProbeRetryDelayMs * 1_000_000),
+                probeAction: probe
+            )
             probeConfirmed = delivered
             if delivered {
                 update(.granted)
             } else {
-                insertLogger.warning("Accessibility probe: OS reported granted but synthesized modifier was not observed — downgrading to .denied (bundle misidentification suspected).")
+                insertLogger.warning("Accessibility probe: OS reported granted but synthesized modifier was not observed after \(Constants.accessibilityProbeRetryCount + 1, privacy: .public) attempts — downgrading to .denied (bundle misidentification or TCC propagation lag).")
                 update(.denied)
             }
         } else {
             probeConfirmed = false
             update(osStatus)
         }
+    }
+
+    // internal for testability — retry policy: runs `probeAction` up to
+    // `maxRetries + 1` times with `delayNs` nanoseconds between attempts.
+    // Returns true if any attempt delivers the synthesized event. A
+    // just-granted permission that fails on attempt 0 but passes on attempt 1
+    // settles as delivered; a persistent failure exhausts all attempts and
+    // returns false so `.recheck()` can downgrade to `.denied`. The `delayNs`
+    // is passed as 0 in tests so the suite doesn't sleep.
+    @MainActor
+    static func probeWithSettle(
+        maxRetries: Int,
+        delayNs: UInt64,
+        probeAction: () -> Bool
+    ) async -> Bool {
+        for attempt in 0...maxRetries {
+            if probeAction() { return true }
+            if attempt < maxRetries {
+                try? await Task.sleep(nanoseconds: delayNs)
+            }
+        }
+        return false
     }
 
     func openSystemSettings() {

@@ -8,12 +8,18 @@ enum FreeFlowError: LocalizedError {
     case audioCapture(underlying: Error)
     case transcription(underlying: Error)
     case textInsertion(underlying: Error)
+    /// A required permission is known-denied, so the cycle was refused before any
+    /// audio was captured (planning 0012 AC5). Carries the capability's display
+    /// name rather than an underlying error — nothing failed, the attempt was
+    /// declined up front.
+    case permission(capability: String)
 
     var errorDescription: String? {
         switch self {
         case .audioCapture(let underlying): return "Couldn't capture audio: \(underlying.localizedDescription)"
         case .transcription(let underlying): return "Couldn't transcribe: \(underlying.localizedDescription)"
         case .textInsertion(let underlying): return "Couldn't paste: \(underlying.localizedDescription)"
+        case .permission(let capability): return "\(capability) permission is needed to dictate."
         }
     }
 }
@@ -164,6 +170,20 @@ final class FreeFlowSession {
             errorSubject.send(.transcription(underlying: TranscriptionError.modelNotLoaded))
             return
         }
+        // Pre-recording capability gate (planning 0012 AC5). Without this the app
+        // accepts a full dictation it cannot possibly complete — the field log has a
+        // 35-second recording captured while Accessibility was denied, which could
+        // only die at paste time with the audio already gone. Declining up front
+        // costs the user nothing; accepting costs them everything they just said.
+        //
+        // Only `.denied` blocks. `.unknown` proceeds, matching the fail-open posture
+        // the insertion guard already uses (planning 0001): an uncertain reading must
+        // never be the thing that stops a dictation.
+        if let blocked = deniedRequiredCapability() {
+            logger.info("Ignoring activate: \(blocked, privacy: .public) is denied")
+            errorSubject.send(.permission(capability: blocked))
+            return
+        }
         stateSubject.send(.recording)
         logger.info("State -> recording")
         let audio = self.audio
@@ -231,6 +251,20 @@ final class FreeFlowSession {
         logger.info("State -> idle")
         applyPendingReconfigurations()
         applyPendingModelSwitch()
+    }
+
+    // internal for testability — the first known-denied required capability, or nil
+    // when none is. Order is the user-facing priority: Accessibility first, since a
+    // denied paste is the failure that silently eats a whole dictation.
+    //
+    // Input Monitoring is deliberately NOT gated here: it is what delivers the
+    // hotkey in the first place, so a denied Input Monitoring means `handleActivate`
+    // is never called at all. Gating on it would be unreachable via the only path
+    // that reaches this method, and would make the gate depend on live TCC state for
+    // a capability whose failure mode is "nothing happens" rather than "audio lost."
+    func deniedRequiredCapability() -> String? {
+        let required: [any Capability] = [accessibility, microphone]
+        return required.first { $0.currentStatus == .denied }?.displayName
     }
 
     // internal for testability — the discard transition (planning 0017):
