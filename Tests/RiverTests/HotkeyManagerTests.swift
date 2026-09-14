@@ -173,6 +173,35 @@ struct HotkeyManagerCancelTests {
     }
 
     @MainActor
+    @Test("Hold: cancelling mid-hold leaves the press latch intact")
+    func holdCancelPreservesPressLatch() {
+        // The Hold half of the cancel-reset asymmetry (planning 0017). Hold tracks
+        // the PHYSICAL key: during a cancel the activation key is still held down,
+        // so the eventual release must read as a release. If `resetTapState` ever
+        // also cleared `isKeyDown`, that release would toggle the latch to "down"
+        // and fire a PHANTOM ACTIVATE — starting a recording as the user lifts off
+        // the key. This test fails the moment that happens.
+        let manager = makeManager(mode: .hold, cancelKeyCode: 63)
+        var activates = 0
+        var deactivates = 0
+        manager.onActivate = { activates += 1 }
+        manager.onDeactivate = { deactivates += 1 }
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))       // hold down → start
+        #expect(activates == 1)
+
+        manager.handle(.flagsChanged(keyCode: 63, flags: .maskSecondaryFn))   // fn while still held
+        manager.resetTapState()                                               // what handleCancel does
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: []))                 // release the held key
+        #expect(deactivates == 1)   // a genuine release edge...
+        #expect(activates == 1)     // ...not a phantom press
+
+        manager.handle(.flagsChanged(keyCode: 62, flags: .maskControl))       // next press
+        #expect(activates == 2)     // starts normally — no swallowed keypress
+    }
+
+    @MainActor
     @Test("cancel works identically in a tap mode")
     func cancelWorksInTapMode() {
         let manager = makeManager(mode: .singleTap, cancelKeyCode: 63)
@@ -288,6 +317,50 @@ struct HotkeyManagerTapTests {
 
         tap(manager)  // a clean tap on the new mode starts a recording
         #expect(activates == 2)
+    }
+
+    @MainActor
+    @Test("single tap: after resetTapState the next tap starts, it is not eaten as a stop")
+    func singleTapAfterResetStarts() {
+        // Planning 0017 field bug: cancel ends the recording through the session,
+        // not through a tap, so without the reset the tap machine stays in
+        // `.recording` and the user's next tap is consumed as a `stop` for a
+        // recording that no longer exists — they must press twice to start again.
+        let manager = makeManager(mode: .singleTap)
+        var activates = 0
+        var deactivates = 0
+        manager.onActivate = { activates += 1 }
+        manager.onDeactivate = { deactivates += 1 }
+
+        tap(manager)                 // start
+        #expect(activates == 1)
+
+        manager.resetTapState()      // stands in for the cancel path
+
+        tap(manager)                 // must START, not stop
+        #expect(activates == 2)
+        #expect(deactivates == 0)
+    }
+
+    @MainActor
+    @Test("double tap: after resetTapState two quick taps start a fresh recording")
+    func doubleTapAfterResetStarts() {
+        let manager = makeManager(mode: .doubleTap)
+        var activates = 0
+        var deactivates = 0
+        manager.onActivate = { activates += 1 }
+        manager.onDeactivate = { deactivates += 1 }
+
+        tap(manager)
+        tap(manager)                 // two quick taps → start
+        #expect(activates == 1)
+
+        manager.resetTapState()      // stands in for the cancel path
+
+        tap(manager)
+        tap(manager)                 // two quick taps → start again
+        #expect(activates == 2)
+        #expect(deactivates == 0)
     }
 
     @MainActor

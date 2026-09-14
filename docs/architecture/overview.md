@@ -21,7 +21,7 @@ AppDelegate (lifecycle only)              │
             │   SettingsStore  ── publishes per-key value changes
             ▼
         Managers (HotkeyManager, AudioCaptureManager,
-                  TextInsertionManager, TranscriptionService)
+                  TextInsertionManager, TranscriptionManager)
             │
             ▼
         Capabilities (InputMonitoringCapability, MicrophoneCapability,
@@ -54,7 +54,7 @@ key press → InputMonitoringCapability → HotkeyManager → RiverSession.onAct
                                                        starts AudioCaptureManager
 key release → RiverSession.onDeactivate
                 ↓
-       state → .processing, TranscriptionService runs,
+       state → .processing, TranscriptionManager runs,
        AccessibilityCapability injects keystrokes, state → .idle
 ```
 
