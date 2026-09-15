@@ -42,15 +42,15 @@ The left number is how many commits `main` has that the branch doesn't. It must 
 
 ### Quit the app before installing
 
-`make install` does `rm -rf` on `/Applications/River.app`. Doing that to a running app deletes the bundle out from under a live process, and since the silent-no-op detector keys off bundle identity, that is a good way to manufacture a confusing false negative that looks like a permissions regression.
+`make install` does `rm -rf` on `/Applications/River.app`. Doing that to a running app deletes the bundle out from under a live process, and since TCC keys grants off bundle identity and signature, that is a good way to manufacture a confusing false negative that looks like a permissions regression.
 
 ### Clean slate before install
 
 If the Homebrew cask is installed, `/Applications/River.app` belongs to it. Removing it first eliminates any ambiguity about which binary is running and which bundle holds the TCC grants. Cheap step; do it first rather than debugging a shadowed build later.
 
-### Expect one permission round-trip per rebuild
+### A rebuild should not need a permission round-trip
 
-Each `make install` re-signs with the self-signed "River Dev" identity, so macOS treats the bundle as a changed binary. Accessibility typically needs one Grant → Refresh round-trip before the app's own launch-time read reports `.granted`. The TCC row survives; the app-side read is the false negative. This is what planning 0012 (PR #33) addresses — until it lands, treat one round-trip as expected, not as a regression.
+Each `make install` re-signs with the self-signed "River Dev" identity. The Accessibility row survives a same-identity rebuild, and the app should launch reading `.granted`. The Grant → Refresh round-trip that earlier builds needed on every launch came from the app's own delivery probe racing an asynchronous event post, not from TCC; the probe is removed (planning 0012 section 6). If a rebuild launches reading not granted now, treat it as a real finding and check the logs before pressing Refresh.
 
 ## "Loading model…" is not downloading
 

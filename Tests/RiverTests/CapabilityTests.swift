@@ -282,52 +282,45 @@ struct FocusedTargetClassificationTests {
     }
 }
 
-@Suite("Accessibility probe settle (retry-with-settle policy)")
-struct AccessibilityProbeSettleTests {
-    // The retry-with-settle policy (planning 0012): after `AXIsProcessTrusted()`
-    // reports trusted, the probe is retried up to `maxRetries` extra times with
-    // a settle delay. These tests exercise `probeWithSettle` in isolation —
-    // no OS interaction, `delayNs: 0` so the suite doesn't sleep.
+@Suite("Accessibility recheck reads OS trust only")
+struct AccessibilityRecheckTests {
+    // Why: status must be exactly what macOS reports. A second check that
+    // raced an asynchronous event post used to turn an accurate `.granted`
+    // into a false `.denied` on most launches (planning 0012), re-opening
+    // onboarding for users who had granted everything. These tests fail if
+    // anything other than the trust read can decide the status again.
 
     @MainActor
-    @Test("probe succeeds on first try — exactly one call, no retries needed")
-    func probeSucceedsFirstTry() async {
-        // Happy path: no TCC propagation lag, probe succeeds immediately.
-        var callCount = 0
-        let result = await AccessibilityCapability.probeWithSettle(
-            maxRetries: 2, delayNs: 0, probeAction: { callCount += 1; return true }
-        )
-        #expect(result == true)
-        #expect(callCount == 1)
+    @Test("trusted process reads granted on every recheck, never a flaky denied")
+    func trustedAlwaysGranted() async {
+        let capability = AccessibilityCapability()
+        capability.trustReadForTesting = { true }
+        for _ in 0..<50 {
+            await capability.recheck()
+            #expect(capability.currentStatus == .granted)
+        }
     }
 
     @MainActor
-    @Test("probe fails once then succeeds — settles to true without exhausting retries")
-    func probeFailsOnceThenSucceeds() async {
-        // Encodes the just-granted TCC-propagation case: the first check races
-        // the grant, but the second attempt (after the settle delay) delivers.
-        // Status must end up as .granted, not .denied.
-        var callCount = 0
-        let result = await AccessibilityCapability.probeWithSettle(
-            maxRetries: 2, delayNs: 0, probeAction: { callCount += 1; return callCount >= 2 }
-        )
-        #expect(result == true)
-        #expect(callCount == 2)
+    @Test("untrusted process reads denied")
+    func untrustedDenied() async {
+        let capability = AccessibilityCapability()
+        capability.trustReadForTesting = { false }
+        await capability.recheck()
+        #expect(capability.currentStatus == .denied)
     }
 
     @MainActor
-    @Test("probe fails all retries — persistent failure returns false (anti-pattern #3 preserved)")
-    func probeFailsAllRetries() async {
-        // Encodes the bundle-misidentification case: a malformed bundle that TCC
-        // accepts but never delivers events. The retry budget must be fully spent
-        // and the result must be false — downgrading to .denied is mandatory to
-        // preserve the honest-status invariant (capabilities.md "no lying").
-        var callCount = 0
-        let result = await AccessibilityCapability.probeWithSettle(
-            maxRetries: 2, delayNs: 0, probeAction: { callCount += 1; return false }
-        )
-        #expect(result == false)
-        #expect(callCount == 3)  // 1 initial + 2 retries
+    @Test("a revoked grant downgrades on the next recheck")
+    func revokedDowngrades() async {
+        let capability = AccessibilityCapability()
+        var trusted = true
+        capability.trustReadForTesting = { trusted }
+        await capability.recheck()
+        #expect(capability.currentStatus == .granted)
+        trusted = false
+        await capability.recheck()
+        #expect(capability.currentStatus == .denied)
     }
 }
 

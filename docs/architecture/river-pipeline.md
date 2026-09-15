@@ -40,9 +40,9 @@ Earlier the mechanism was clipboard + synthesized ⌘V with a save/restore aroun
 
 ## Capability failures are typed errors
 
-If `AccessibilityCapability.postKeyEvent` throws (status not `.granted`, or the silent-no-op detector fires), it does so on the first injected event — before any character lands — and `TextInsertionManager` rethrows; `RiverSession.handleDeactivate` catches the error, logs at `.error` (path-redacted per [ADR 0002](../decisions/0002-log-redaction-over-debug-flag.md)), and returns to `.idle`. There are now **two** user-visible surfaces:
+If `AccessibilityCapability.postKeyEvent` throws (status not `.granted`), it does so on the first injected event — before any character lands — and `TextInsertionManager` rethrows; `RiverSession.handleDeactivate` catches the error, logs at `.error` (path-redacted per [ADR 0002](../decisions/0002-log-redaction-over-debug-flag.md)), and returns to `.idle`. There are now **two** user-visible surfaces:
 
-- **Permission-misconfigured path** — structural. The silent-no-op detector calls `update(.denied)` on the capability, which `OnboardingCoordinator` observes as a `.granted → !.granted` transition and re-presents onboarding with permission-specific copy.
+- **Permission-revoked path** — structural. A recheck that reads `.denied` updates the capability, which `OnboardingCoordinator` observes as a `.granted → !.granted` transition and re-presents onboarding with permission-specific copy.
 - **Transient cycle failures** (a momentary `cghidEventTap` refusal, a transcription or capture error) — the session emits a typed `RiverError` on its `errors` publisher. [`AppState`](app-state-and-menu-bar.md) bridges that to the menu bar, which shows a warning glyph over the idle icon plus the (path-redacted) message. The emission never blocks the return to `.idle`.
 
 This is the surface the menu-bar visual-state milestone landed (it brought the renderer and the `errors` publisher together, as planned). It is **not** a substitute for the permission path above — a genuinely denied capability still routes through onboarding, not a transient toast.

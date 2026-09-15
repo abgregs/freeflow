@@ -36,7 +36,7 @@ Status is read with non-prompting APIs and never inferred from a different permi
 
 TCC keys grants by bundle identifier and code signature. If the bundle ID changes (e.g., from missing `Info.plist` to a present one), macOS treats the new bundle as a different app — and the old grants do not transfer. The user sees two entries for "River" and must clean up.
 
-`AccessibilityCapability` includes a silent-no-op detector for the bundle-misidentification failure mode: it attempts a small synthesized round-trip on `recheck()` and on first use, and reports `.denied` if the OS accepts the call without delivering it. This is the symptom of a malformed bundle and the cue to fix it (or to clear stale TCC entries).
+Accessibility status is the `AXIsProcessTrusted()` read alone. It reports on *this running process*, so a stale grant for a different build reads `.denied` honestly. A bundle signed without its identifier, which TCC can trust yet refuse to deliver events for, is prevented at build time by `make verify`'s identifier assertion ([anti-patterns.md](../conventions/anti-patterns.md) #3), not detected at runtime.
 
 Stable bundle ID + stable signing identity prevents the churn. See [distribution.md](distribution.md).
 
