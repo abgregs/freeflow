@@ -21,8 +21,9 @@ brew tap abgregs/river && brew install --cask river
 
 ## One-time tap setup
 
-1. Create a public repo named exactly `homebrew-river`.
-2. Add `Casks/river.rb` — copy this folder's `river.rb`.
+1. Create a public repo named exactly `homebrew-river` with any initial commit
+   (a README is enough).
+2. Nothing else: the first release tag's tap-bump step creates `Casks/river.rb`.
 
 ## Per release
 
