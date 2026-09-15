@@ -1,75 +1,19 @@
 # River
 
-River is a free, open-source macOS menu bar dictation app: hold (or tap) a key, speak, and your words appear at your cursor — transcribed entirely on-device with [WhisperKit](https://github.com/argmaxinc/WhisperKit).
+**Dictation that follows you wherever you go.**
+
+Hold (or tap) a key, speak, and your words appear at the cursor — in any app you can type into, transcribed entirely on your Mac with [WhisperKit](https://github.com/argmaxinc/WhisperKit).
 
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue?style=for-the-badge)
 ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-lightgrey?style=for-the-badge)
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-- works in any app you can type into — Slack, browser, terminal, IDE
-- three activation modes (Hold, Single Tap, Double Tap) on your choice of ten keys
-- clipboard-safe: text is typed straight in, your clipboard is never touched
-- 100% on-device — no account, no telemetry, no subscription
+- Works everywhere you type — Slack, browser, terminal, IDE.
+- Three activation modes (Hold, Single Tap, Double Tap) on your choice of ten keys.
+- Text is typed straight in; your clipboard is never touched.
+- 100% on-device — no account, no telemetry, no subscription.
 
-<!-- TODO(screenshots): capture from the running app and drop into assets/
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <img src="assets/menu-bar.png" alt="River in the menu bar" />
-      <br />
-      <sub>Menu bar: Ready → Recording → Processing</sub>
-    </td>
-    <td width="50%" align="center">
-      <img src="assets/settings.png" alt="River settings" />
-      <br />
-      <sub>Settings: activation key and mode</sub>
-    </td>
-  </tr>
-</table>
--->
-
-> [!NOTE]
-> River **v0.1.0** is out — a signed, notarized release. Install via [Homebrew](#install), grab the [`.dmg`](https://github.com/abgregs/river/releases/latest), or [build from source](#build-from-source).
-
-## Why River?
-
-The name is the pitch. Your words flow in wherever the cursor is — one hotkey in every app you can type into, not a voice mode locked to one tool — and they keep flowing as you speak: a river follows the ground, and the text follows you. Everything runs on your Mac: no account, no subscription, nothing leaves the machine. Speak the thought and stay in the work.
-
-## How it works
-
-```mermaid
-%%{init: {"flowchart": {"curve": "basis"}}}%%
-flowchart LR
-    subgraph mac[" nothing leaves your Mac "]
-        direction LR
-        A("press or tap<br/>your activation key") -.-> B("record")
-        B -.-> C("release<br/>or tap again")
-        C -.-> D("transcribe on-device<br/>with WhisperKit")
-        D -.-> E("type at cursor —<br/>clipboard untouched")
-    end
-
-    classDef step fill:#4f8cc922,stroke:#5b8db8,stroke-width:1.5px
-    classDef boundary fill:transparent,stroke:#8a93a2,stroke-width:1.5px,stroke-dasharray:6 5
-    class A,B,C,D,E step
-    class mac boundary
-    linkStyle default stroke:#5b8db8,stroke-width:1.5px
-```
-
-The menu bar icon tracks each state of the cycle. Text is typed straight in at your cursor as synthesized keystrokes — River never reads or writes the system clipboard, so a dictation can't leak into your clipboard history and whatever you had copied is left exactly as it was.
-
-> [!NOTE]
-> First launch downloads the default model (~240 MB) from Hugging Face into `~/Library/Application Support/River`. Every launch and dictation after that is fully offline.
-
-## Features
-
-| Feature | Details |
-|---|---|
-| Activation modes | Hold (push-to-talk), Single Tap, or Double Tap |
-| Configurable key | Ten modifier-key options; default is Right Option |
-| Clipboard untouched | Text is typed in via keystroke injection — your clipboard is never read or written; a guard skips non-editable targets |
-| Live settings | Key and mode changes apply instantly — no restart |
-| Guided onboarding | Step-by-step setup for Microphone, Input Monitoring, and Accessibility |
-| Languages | English only for now; multilingual may come later |
+First launch downloads the default model (~240 MB) into `~/Library/Application Support/River`. Everything after that is offline.
 
 ## Install
 
@@ -77,13 +21,11 @@ The menu bar icon tracks each state of the cycle. Text is typed straight in at y
 brew install --cask abgregs/river/river
 ```
 
-Or download the signed, notarized [`.dmg`](https://github.com/abgregs/river/releases/latest) and drag River to Applications.
-
-Requirements: macOS 14+ on Apple Silicon.
+Or download the signed, notarized [`.dmg`](https://github.com/abgregs/river/releases/latest) and drag River to Applications. Requires macOS 14+ on Apple Silicon.
 
 ## Build from source
 
-Requires only the Xcode Command Line Tools (`xcode-select --install`) — no full Xcode needed.
+Only the Xcode Command Line Tools are needed (`xcode-select --install`).
 
 1. One-time: create a self-signed certificate named "River Dev" (Keychain Access → Certificate Assistant → Create a Certificate → Self Signed Root → Code Signing). Details in [docs/architecture/distribution.md](docs/architecture/distribution.md).
 2. Build and install:

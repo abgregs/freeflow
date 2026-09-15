@@ -18,6 +18,9 @@ What the product is supposed to do: the core feature spec, the activation-key/mo
 ### [planning/](planning/_index.md)
 Active and future work: the walking-skeleton milestone, milestone roadmap, current focus.
 
+### [design/](design/_index.md)
+What the app should look, move, and sound like: the identity brief and the principles each surface is designed against.
+
 ### [decisions/](decisions/_index.md)
 ADRs — load-bearing architectural decisions and the rationale for *not* taking specific refactors. Read before re-suggesting a known-deferred change.
 

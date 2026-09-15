@@ -6,8 +6,8 @@ import Testing
 struct UpdaterManagerTests {
     // Sparkle raises a blocking "updater failed to start" alert on launch when
     // SUPublicEDKey is invalid. The placeholder shipped in Info.plist until the
-    // post-rename keypair exists must therefore read as unconfigured, while a real
-    // key must read as configured with no code change.
+    // first-release keypair exists must therefore read as unconfigured, while a
+    // real key must read as configured with no code change.
 
     @Test("the Info.plist placeholder is not a usable key")
     func placeholderIsRejected() {
