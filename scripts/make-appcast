@@ -11,19 +11,33 @@
 # every past DMG to rebuild a cumulative feed in CI.
 #
 #   scripts/make-appcast <download-url> <short-version> <build-number> \
-#                        <min-system-version> <signature-attributes>
+#                        <min-system-version> <signature-attributes> [notes-file]
 #
 # <signature-attributes> is the raw stdout of Sparkle's `sign_update`, e.g.
 #   sparkle:edSignature="BASE64==" length="12345678"
+# [notes-file] is optional: the curated CHANGELOG section for this version
+# (planning 0013) — embedded as the item's <description> so Sparkle's update
+# window shows the same notes as the GitHub Release.
 set -euo pipefail
 
-URL="${1:?usage: make-appcast <download-url> <short-version> <build-number> <min-system-version> <signature-attributes>}"
+URL="${1:?usage: make-appcast <download-url> <short-version> <build-number> <min-system-version> <signature-attributes> [notes-file]}"
 SHORT_VERSION="${2:?missing short-version}"
 BUILD="${3:?missing build-number}"
 MIN_SYSTEM="${4:?missing min-system-version}"
 SIGNATURE_ATTRS="${5:?missing signature-attributes (sign_update output)}"
+NOTES_FILE="${6:-}"
 
 PUB_DATE="$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"
+
+# Sparkle renders <description> as HTML, but the notes are markdown. Escaping
+# and wrapping in <pre> keeps them readable without dragging a markdown
+# renderer into the pipeline; escaping also guarantees no ']]>' can terminate
+# the CDATA early.
+DESCRIPTION=""
+if [ -n "$NOTES_FILE" ] && [ -s "$NOTES_FILE" ]; then
+  ESCAPED="$(sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$NOTES_FILE")"
+  DESCRIPTION="      <description><![CDATA[<pre>${ESCAPED}</pre>]]></description>"
+fi
 
 cat <<XML
 <?xml version="1.0" encoding="utf-8"?>
@@ -35,6 +49,7 @@ cat <<XML
     <language>en</language>
     <item>
       <title>${SHORT_VERSION}</title>
+${DESCRIPTION}
       <pubDate>${PUB_DATE}</pubDate>
       <sparkle:version>${BUILD}</sparkle:version>
       <sparkle:shortVersionString>${SHORT_VERSION}</sparkle:shortVersionString>

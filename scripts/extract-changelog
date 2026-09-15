@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Extract the ## [VERSION] section from CHANGELOG.md.
+#
+# Prints the body (all lines after the header) through the next ## header or
+# EOF. Exits 1 with a message to stderr if the section is not found — a
+# missing changelog entry should fail the release, not silently fall back to
+# PR-title noise (planning 0013).
+#
+#   scripts/extract-changelog <version> [changelog-path]
+#
+# <version> is the bare version string, e.g. "0.1.0" (no "v" prefix).
+# Defaults to CHANGELOG.md in the current directory when omitted.
+set -euo pipefail
+
+VERSION="${1:?usage: extract-changelog <version> [changelog-path]}"
+CHANGELOG="${2:-CHANGELOG.md}"
+
+if [ ! -f "$CHANGELOG" ]; then
+  printf 'error: changelog not found: %s\n' "$CHANGELOG" >&2
+  exit 1
+fi
+
+# Use a literal prefix match (substr) instead of a regex so that dots in the
+# version string are not treated as regex metacharacters.
+awk -v version="$VERSION" '
+BEGIN {
+  found  = 0
+  header = "## [" version "]"
+}
+/^## \[/ {
+  if (found) { exit }
+  if (substr($0, 1, length(header)) == header) { found = 1; next }
+}
+found { print }
+END {
+  if (!found) {
+    print "error: no changelog section for version " version > "/dev/stderr"
+    exit 1
+  }
+}
+' "$CHANGELOG"
