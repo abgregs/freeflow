@@ -35,10 +35,9 @@ final class UpdaterManager {
     func start() {
         guard controller == nil else { return }
         // Sparkle validates SUPublicEDKey on start and shows a blocking "updater
-        // failed to start" alert when it is invalid. Until the real key is pasted
-        // into Info.plist — deliberately deferred to the first release (planning
-        // 0027) — the plist holds a placeholder, so don't start at all: no alert,
-        // no feed requests. Starts on its own once a valid key is present.
+        // failed to start" alert when it is invalid. If the key is missing or a
+        // placeholder (a malformed bundle, or a fork without its own keypair),
+        // don't start at all: no alert, no feed requests.
         guard Self.isConfigured else {
             logger.info("Sparkle not started: SUPublicEDKey is missing or a placeholder")
             return

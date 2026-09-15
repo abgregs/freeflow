@@ -32,13 +32,12 @@
          copy learns about newer versions without a separate host. -->
     <key>SUFeedURL</key>
     <string>https://github.com/abgregs/river/releases/latest/download/appcast.xml</string>
-    <!-- Sparkle EdDSA public key. PLACEHOLDER — the MAINTAINER generates the
-         keypair once with Sparkle's `generate_keys`, pastes the printed public
-         key here, and stores the private key as the `SPARKLE_PRIVATE_KEY` CI
-         secret. See docs/architecture/release-pipeline.md. Auto-update stays
-         inert (updates fail signature verification) until this is real. Never
-         commit the private key. -->
+    <!-- Sparkle EdDSA public key, generated once with Sparkle's `generate_keys`.
+         The matching private key lives in the maintainer's keychain and the
+         `SPARKLE_PRIVATE_KEY` CI secret. Every shipped build trusts only this
+         key, so never rotate it casually and never commit the private key.
+         See docs/architecture/release-pipeline.md. -->
     <key>SUPublicEDKey</key>
-    <string>REPLACE_WITH_SPARKLE_ED_PUBLIC_KEY</string>
+    <string>iw1MJrQRpW+dBJxlSDSLAT3WPoXRLCmcaBPZPCnSlVQ=</string>
 </dict>
 </plist>
