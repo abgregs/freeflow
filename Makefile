@@ -13,6 +13,21 @@ SPARKLE_EMBEDDED := $(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework
 SWIFT_FLAGS ?=
 INFO_PLIST := Sources/River/Resources/Info.plist
 ENTITLEMENTS := Sources/River/Resources/River.entitlements
+# Hardened runtime enforces library validation: embedded non-Apple code must be
+# signed with the app's own Team ID. The self-signed dev identity has no Team ID,
+# so macOS refuses to load the embedded Sparkle.framework and the app dies at
+# launch. Dev builds therefore sign the app with library validation disabled; any
+# other identity (the release workflow's Developer ID, which has a Team ID) signs
+# with the plain entitlements and keeps it on. The dev file is generated from
+# ENTITLEMENTS so the two can't drift, and `verify` fails a non-dev build that
+# carries the dev entitlement.
+DEV_SIGN_IDENTITY := River Dev
+DEV_ENTITLEMENTS := $(BUILD_DIR)/River.dev.entitlements
+ifeq ($(SIGN_IDENTITY),$(DEV_SIGN_IDENTITY))
+APP_ENTITLEMENTS := $(DEV_ENTITLEMENTS)
+else
+APP_ENTITLEMENTS := $(ENTITLEMENTS)
+endif
 INSTALL_DIR := /Applications
 
 .PHONY: build bundle sign verify install clean test
@@ -53,8 +68,10 @@ sign: bundle
 	codesign --force --options runtime \
 		--sign "$(SIGN_IDENTITY)" \
 		$(SPARKLE_EMBEDDED)
+	cp $(ENTITLEMENTS) $(DEV_ENTITLEMENTS)
+	/usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.disable-library-validation bool true" $(DEV_ENTITLEMENTS)
 	codesign --force --options runtime \
-		--entitlements $(ENTITLEMENTS) \
+		--entitlements $(APP_ENTITLEMENTS) \
 		--sign "$(SIGN_IDENTITY)" \
 		$(APP_BUNDLE)
 
@@ -65,6 +82,10 @@ verify: sign
 		(echo "FAIL: bundle identifier is not $(BUNDLE_ID)"; exit 1)
 	@echo "--- entitlements ---"
 	@codesign -d --entitlements - --xml $(APP_BUNDLE) 2>/dev/null | plutil -p - || true
+ifneq ($(SIGN_IDENTITY),$(DEV_SIGN_IDENTITY))
+	@if codesign -d --entitlements - --xml $(APP_BUNDLE) 2>/dev/null | grep -q disable-library-validation; then \
+		echo "FAIL: a non-dev build must not disable library validation"; exit 1; fi
+endif
 	@echo "OK: bundle identifier matches"
 
 install: verify
