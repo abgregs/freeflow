@@ -80,7 +80,11 @@ private struct MenuBarContent: View {
         Button("Copy Last Transcription", action: copyLastTranscript)
             .disabled(!appState.hasLastTranscript)
         Divider()
-        Button("Check for Updates…", action: checkForUpdates)
+        // Hidden until a real Sparkle key is configured — a menu item that does
+        // nothing, or raises an error alert, is worse than no item.
+        if UpdaterManager.isConfigured {
+            Button("Check for Updates…", action: checkForUpdates)
+        }
         Button("Permissions…", action: openPermissions)
         Button("Settings…") {
             NSApp.activate(ignoringOtherApps: true)

@@ -219,7 +219,6 @@ struct AppStateTests {
             audio: AudioCaptureManager(microphone: microphone),
             textInsertion: TextInsertionManager(accessibility: accessibility),
             transcription: transcription,
-            mediaPause: MediaPauseManager(controller: FakeMediaController()),
             settings: store
         )
         let appState = AppState()
