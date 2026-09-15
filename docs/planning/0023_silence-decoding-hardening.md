@@ -23,6 +23,34 @@ A queued backlog item from the 2026-07-06 transcription-quality review. Eliminat
 4. All thresholds live in `Constants`; no new `SettingKey`s.
 5. Behavior holds across the 0021 curated model list (the thresholds must not be tuned to one model).
 
+## Field observations (2026-09-14): unwanted text appended to real dictations
+
+**Not yet fixed. Recorded to inform the next pass on this spec.**
+
+Two separate instances during the #30–#36 smoke testing. In both, a normal dictation pasted correctly, with extra text appended at the end that the user never said:
+
+1. **A trailing `[BLANK_AUDIO]`** after real speech.
+2. **"Thanks for watching"** after real speech, with no obvious source.
+
+**Why the shipped 0023 work doesn't catch either:**
+
+- `TranscriptionManager.isNonSpeechAnnotation` classifies the **whole output only**. Mixed annotation-and-speech output is deliberately left untouched, so dictation that legitimately contains brackets never loses content. A trailing `[BLANK_AUDIO]` after real words is exactly that mixed case, so it passes through.
+- "Thanks for watching" contains no brackets, so no annotation filter can match it.
+- The code already records that the decode gates (`noSpeechThreshold`, `logProbThreshold`, `compressionRatioThreshold`, temperature fallback) "do not reliably suppress these."
+
+**Working hypothesis — one cause, two symptoms.** Both appear at the **end** of a recording, which points at the trailing tail: the stretch between the user finishing speaking and releasing or tapping the hotkey. That tail is room tone, breath, or keyboard noise. If it sits above the silence-trim threshold it survives into the decode, and Whisper transcribes near-silence as either an annotation or a hallucinated phrase. "Thanks for watching" is one of Whisper's best-documented hallucinations, from YouTube subtitles in its training data, and it typically appears on silent or non-speech audio. Temperature fallback on a low-confidence final segment makes hallucination more likely, not less.
+
+**One alternative to rule out first:** the "Thanks for watching" instance happened during the same session as the #34 media-pause test, which involved a YouTube video playing near the microphone. If a video was audible while that dictation was recorded, the phrase may be real captured audio rather than a hallucination. Worth checking before designing around it.
+
+**Candidate directions, roughly in order of preference:**
+
+- **Filter per segment, not per output.** WhisperKit returns segments with their own no-speech probability and average log probability. Dropping a *trailing* segment that is annotation-only or low-confidence removes both symptoms while keeping bracketed words inside real speech.
+- **Tighten the trailing trim** so the tail after the last speech is cut before decoding, rather than relying on a whole-clip energy threshold.
+- **Avoid temperature fallback on the final segment**, where a low-confidence retry is the hallucination risk.
+- **A known-phrase blocklist** ("Thanks for watching", "Subscribe", and similar). Brittle and English-specific, so a last resort, but cheap and effective against the most common offenders.
+
+The eval harness (0022) is the instrument for any of these: add a few clips that end in a second or two of room tone and check whether output gains trailing text.
+
 ## Related
 
 - [0022_transcription-eval-harness.md](0022_transcription-eval-harness.md) — the silence fixtures and WER-regression instrument for every threshold here
