@@ -52,6 +52,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SoundFeedbackController(appState: appState, settings: settings)
     }()
 
+    let updater = UpdaterManager()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Application did finish launching")
         appState.bind(to: session)
@@ -60,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onboarding.start()
         recordingIndicator.start()
         soundFeedback.start()
+        updater.start()
         Task { @MainActor in
             do { try await session.start() }
             catch { logger.error("Failed to start session: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)") }

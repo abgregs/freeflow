@@ -2,12 +2,32 @@ APP_NAME := River
 BUNDLE_ID := com.river.app
 SIGN_IDENTITY := River Dev
 BUILD_DIR := .build
+RELEASE_BIN_DIR := $(BUILD_DIR)/arm64-apple-macosx/release
 APP_BUNDLE := $(BUILD_DIR)/$(APP_NAME).app
+# Sparkle ships as a dynamic framework the app links at @rpath (planning 0009).
+# SwiftPM drops it next to the release products; the bundle embeds it.
+SPARKLE_FRAMEWORK := $(RELEASE_BIN_DIR)/Sparkle.framework
+SPARKLE_EMBEDDED := $(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework
 # Extra flags forwarded to `swift build`. Empty for local builds; the release
 # workflow passes `-Xswiftc -DRIVER_RELEASE` to compile out dev-only UI.
 SWIFT_FLAGS ?=
 INFO_PLIST := Sources/River/Resources/Info.plist
 ENTITLEMENTS := Sources/River/Resources/River.entitlements
+# Hardened runtime enforces library validation: embedded non-Apple code must be
+# signed with the app's own Team ID. The self-signed dev identity has no Team ID,
+# so macOS refuses to load the embedded Sparkle.framework and the app dies at
+# launch. Dev builds therefore sign the app with library validation disabled; any
+# other identity (the release workflow's Developer ID, which has a Team ID) signs
+# with the plain entitlements and keeps it on. The dev file is generated from
+# ENTITLEMENTS so the two can't drift, and `verify` fails a non-dev build that
+# carries the dev entitlement.
+DEV_SIGN_IDENTITY := River Dev
+DEV_ENTITLEMENTS := $(BUILD_DIR)/River.dev.entitlements
+ifeq ($(SIGN_IDENTITY),$(DEV_SIGN_IDENTITY))
+APP_ENTITLEMENTS := $(DEV_ENTITLEMENTS)
+else
+APP_ENTITLEMENTS := $(ENTITLEMENTS)
+endif
 INSTALL_DIR := /Applications
 
 .PHONY: build bundle sign verify install clean test
@@ -19,12 +39,39 @@ bundle: build
 	rm -rf $(APP_BUNDLE)
 	mkdir -p $(APP_BUNDLE)/Contents/MacOS
 	mkdir -p $(APP_BUNDLE)/Contents/Resources
-	cp $(BUILD_DIR)/arm64-apple-macosx/release/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
+	mkdir -p $(APP_BUNDLE)/Contents/Frameworks
+	cp $(RELEASE_BIN_DIR)/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
 	cp $(INFO_PLIST) $(APP_BUNDLE)/Contents/Info.plist
+	# Embed Sparkle.framework and point the binary's rpath at Contents/Frameworks
+	# so @rpath/Sparkle.framework resolves at launch. `ditto` preserves the
+	# framework's version symlinks; without the embed the app fails to launch.
+	ditto $(SPARKLE_FRAMEWORK) $(SPARKLE_EMBEDDED)
+	install_name_tool -add_rpath @executable_path/../Frameworks $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
 
 sign: bundle
+	# Sign inside-out (planning 0009): codesign requires every nested Mach-O
+	# bundle signed before the framework, and the framework before the app.
+	# --options runtime (hardened runtime) is mandatory for notarization; the
+	# Downloader XPC keeps its shipped entitlements.
+	codesign --force --options runtime --preserve-metadata=entitlements \
+		--sign "$(SIGN_IDENTITY)" \
+		$(SPARKLE_EMBEDDED)/Versions/B/XPCServices/Downloader.xpc
 	codesign --force --options runtime \
-		--entitlements $(ENTITLEMENTS) \
+		--sign "$(SIGN_IDENTITY)" \
+		$(SPARKLE_EMBEDDED)/Versions/B/XPCServices/Installer.xpc
+	codesign --force --options runtime \
+		--sign "$(SIGN_IDENTITY)" \
+		$(SPARKLE_EMBEDDED)/Versions/B/Autoupdate
+	codesign --force --options runtime \
+		--sign "$(SIGN_IDENTITY)" \
+		$(SPARKLE_EMBEDDED)/Versions/B/Updater.app
+	codesign --force --options runtime \
+		--sign "$(SIGN_IDENTITY)" \
+		$(SPARKLE_EMBEDDED)
+	cp $(ENTITLEMENTS) $(DEV_ENTITLEMENTS)
+	/usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.disable-library-validation bool true" $(DEV_ENTITLEMENTS)
+	codesign --force --options runtime \
+		--entitlements $(APP_ENTITLEMENTS) \
 		--sign "$(SIGN_IDENTITY)" \
 		$(APP_BUNDLE)
 
@@ -35,6 +82,10 @@ verify: sign
 		(echo "FAIL: bundle identifier is not $(BUNDLE_ID)"; exit 1)
 	@echo "--- entitlements ---"
 	@codesign -d --entitlements - --xml $(APP_BUNDLE) 2>/dev/null | plutil -p - || true
+ifneq ($(SIGN_IDENTITY),$(DEV_SIGN_IDENTITY))
+	@if codesign -d --entitlements - --xml $(APP_BUNDLE) 2>/dev/null | grep -q disable-library-validation; then \
+		echo "FAIL: a non-dev build must not disable library validation"; exit 1; fi
+endif
 	@echo "OK: bundle identifier matches"
 
 install: verify
