@@ -18,14 +18,11 @@ enum FocusedTargetClassification: Equatable {
 
 enum AccessibilityCapabilityError: Error, LocalizedError {
     case notGranted
-    case silentNoOp
 
     var errorDescription: String? {
         switch self {
         case .notGranted:
             return "Accessibility permission is not granted; synthesized paste cannot be delivered."
-        case .silentNoOp:
-            return "Accessibility appears granted but synthesized events are not being delivered. Likely a bundle-misidentification mismatch in TCC — remove the existing entry from System Settings → Privacy & Security → Accessibility, re-add /Applications/River.app, and relaunch."
         }
     }
 }
@@ -40,8 +37,8 @@ final class AccessibilityCapability: Capability {
     private let insertLogger = Logger(subsystem: Constants.loggingSubsystem, category: "insert")
     private let subject: CurrentValueSubject<CapabilityStatus, Never>
 
-    // internal for testability — when true, `postKeyEvent` short-circuits both
-    // the silent-no-op probe and the real `CGEvent.post`. Mirrors
+    // internal for testability — when true, `postKeyEvent` short-circuits the
+    // real `CGEvent.post`. Mirrors
     // `MicrophoneCapability.skipEngineForTesting`: the test runner often has
     // Accessibility granted (or in CI doesn't, but the trustedness check leaks
     // into the test process either way), so without this the production paste
@@ -60,20 +57,18 @@ final class AccessibilityCapability: Capability {
     // open or closed for a single test. Mirrors `MicrophoneCapability`'s
     // `publishForTest` shape: a single named seam, marked clearly.
     func setStatusForTesting(_ status: CapabilityStatus) {
-        probeConfirmed = (status == .granted)
         subject.send(status)
     }
+
+    // internal for testability — replaces the `AXIsProcessTrusted()` read in
+    // `recheck()` so tests can pin what the OS reports. `nil` in production.
+    var trustReadForTesting: (() -> Bool)?
 
     // internal for testability — pins the focused-target classification so
     // manager tests never reach the real AX read (which would classify
     // whatever the test runner's host happens to have focused at test time).
     // Mirrors `skipPostForTesting`.
     var focusedTargetForTesting: FocusedTargetClassification?
-
-    // Whether the silent-no-op probe has confirmed the capability for this
-    // process this launch. Reset whenever the OS view drops below `.granted`
-    // (e.g., during a `recheck()` after the user revokes the grant).
-    private var probeConfirmed = false
 
     var status: AnyPublisher<CapabilityStatus, Never> { subject.eraseToAnyPublisher() }
     var currentStatus: CapabilityStatus { subject.value }
@@ -82,64 +77,16 @@ final class AccessibilityCapability: Capability {
         subject = CurrentValueSubject(Self.readStatus())
     }
 
+    // Status is the OS trust read alone. An earlier revision also posted a
+    // synthesized Shift and read the modifier state back to detect a bundle
+    // that TCC trusts but never delivers events for (anti-pattern #3). That
+    // read-back raced the asynchronous post and failed most launches, turning
+    // an accurate `.granted` into a false `.denied` (planning 0012). The
+    // misidentified-bundle case is prevented at build time instead: `make
+    // verify` and the release workflow assert the signed bundle identifier.
     func recheck() async {
-        let osStatus = Self.readStatus()
-        if osStatus == .granted {
-            // Bundle-misidentification backstop: when TCC reports `.granted` we
-            // still verify a synthesized round-trip lands. `permissions.md` and
-            // `capabilities.md` prescribe this as the structural detector for
-            // anti-pattern #3 (a malformed bundle that signs and trusts but
-            // silently no-ops on `CGEvent.post`).
-            if skipPostForTesting {
-                probeConfirmed = true
-                update(.granted)
-                return
-            }
-            // Retry the probe a few times with a short settle delay: a freshly-
-            // granted Accessibility permission often isn't reflected on the first
-            // check because macOS doesn't push TCC grants to an already-running
-            // process. A persistent failure — all retries exhausted — still
-            // downgrades to .denied, preserving the bundle-misidentification
-            // detector (anti-pattern #3). Only the transient just-granted case
-            // is forgiven.
-            let delivered = await Self.probeWithSettle(
-                maxRetries: Constants.accessibilityProbeRetryCount,
-                delayNs: UInt64(Constants.accessibilityProbeRetryDelayMs * 1_000_000),
-                probeAction: probe
-            )
-            probeConfirmed = delivered
-            if delivered {
-                update(.granted)
-            } else {
-                insertLogger.warning("Accessibility probe: OS reported granted but synthesized modifier was not observed after \(Constants.accessibilityProbeRetryCount + 1, privacy: .public) attempts — downgrading to .denied (bundle misidentification or TCC propagation lag).")
-                update(.denied)
-            }
-        } else {
-            probeConfirmed = false
-            update(osStatus)
-        }
-    }
-
-    // internal for testability — retry policy: runs `probeAction` up to
-    // `maxRetries + 1` times with `delayNs` nanoseconds between attempts.
-    // Returns true if any attempt delivers the synthesized event. A
-    // just-granted permission that fails on attempt 0 but passes on attempt 1
-    // settles as delivered; a persistent failure exhausts all attempts and
-    // returns false so `.recheck()` can downgrade to `.denied`. The `delayNs`
-    // is passed as 0 in tests so the suite doesn't sleep.
-    @MainActor
-    static func probeWithSettle(
-        maxRetries: Int,
-        delayNs: UInt64,
-        probeAction: () -> Bool
-    ) async -> Bool {
-        for attempt in 0...maxRetries {
-            if probeAction() { return true }
-            if attempt < maxRetries {
-                try? await Task.sleep(nanoseconds: delayNs)
-            }
-        }
-        return false
+        let isTrusted = trustReadForTesting?() ?? AXIsProcessTrusted()
+        update(Self.map(isTrusted: isTrusted))
     }
 
     func openSystemSettings() {
@@ -148,8 +95,7 @@ final class AccessibilityCapability: Capability {
 
     /// Post a synthesized `CGEvent`. This is the **only** `CGEvent.post` call
     /// site in the project (load-bearing rule #3 in CLAUDE.md). Throws if
-    /// status is not `.granted`, or if the bundle-misidentification probe
-    /// indicates the post would silently no-op. Production calls deliver to
+    /// status is not `.granted`. Production calls deliver to
     /// `.cghidEventTap` so the event traverses the full input pipeline and
     /// target apps see it as a real keystroke.
     func postKeyEvent(_ event: CGEvent) throws {
@@ -160,42 +106,7 @@ final class AccessibilityCapability: Capability {
             postedEventCountForTesting += 1
             return
         }
-        if !probeConfirmed {
-            let delivered = probe()
-            if !delivered {
-                insertLogger.warning("Accessibility first-use probe failed; downgrading status and refusing post.")
-                update(.denied)
-                throw AccessibilityCapabilityError.silentNoOp
-            }
-            probeConfirmed = true
-        }
         event.post(tap: .cghidEventTap)
-    }
-
-    // internal for testability — pure round-trip detector for the TCC bundle-
-    // misidentification silent-no-op case (anti-pattern #3). Synthesizes a
-    // Shift modifier-down, reads `CGEventSource.flagsState(.combinedSessionState)`,
-    // and expects the shift bit to be set. Restores by synthesizing the release.
-    // Returns true when the OS reflected the synthesized state.
-    //
-    // Why Shift: invisible to any text field (no character produced, no LED).
-    // Why `.cghidEventTap`: matches the production paste tap so a probe failure
-    // mirrors a real post failure end-to-end. If this technique ever proves
-    // unreliable in practice, the documented plan-B is a CapsLock toggle pair
-    // using `CGEventSource.keyState(.combinedSessionState, key: .capsLock)`
-    // (invasive but unambiguous — toggles a visible LED).
-    func probe() -> Bool {
-        guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 56, keyDown: true) else {
-            return false
-        }
-        down.flags = .maskShift
-        down.post(tap: .cghidEventTap)
-        let observed = CGEventSource.flagsState(.combinedSessionState).contains(.maskShift)
-        if let up = CGEvent(keyboardEventSource: nil, virtualKey: 56, keyDown: false) {
-            up.flags = []
-            up.post(tap: .cghidEventTap)
-        }
-        return observed
     }
 
     /// Read-only focused-element role check for the paste guard (planning
@@ -311,8 +222,8 @@ final class AccessibilityCapability: Capability {
 
     /// `AXIsProcessTrusted()` reports whether *this running process* is trusted,
     /// so a stale grant for a previous build reads as `.denied` honestly — there
-    /// is no false `.granted` from a stale cdhash. The remaining honesty gap is
-    /// the bundle-misidentification case, which the `probe()` round-trip catches.
+    /// is no false `.granted` from a stale cdhash. A bundle signed without its
+    /// identifier is caught at build time by `make verify`, not at runtime.
     /// internal for testability (the OS call above can't be exercised in CI).
     static func map(isTrusted: Bool) -> CapabilityStatus {
         isTrusted ? .granted : .denied

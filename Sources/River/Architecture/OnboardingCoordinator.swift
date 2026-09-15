@@ -6,8 +6,8 @@ import os
 
 /// Owns launch-UI orchestration: the onboarding gate, the window's construction
 /// and dismissal, and the runtime subscription that re-opens the window when a
-/// capability's status degrades (e.g., M7's silent-no-op detector flips
-/// `AccessibilityCapability.status` from `.granted` to `.denied`). Keeps
+/// capability's status degrades (e.g., the user revokes Accessibility and a
+/// recheck flips its status from `.granted` to `.denied`). Keeps
 /// `AppDelegate` as the documented "thin lifecycle shell" by hosting the
 /// publisher subscriptions and `NSWindow` lifetime that would otherwise
 /// accumulate there.
@@ -56,8 +56,8 @@ final class OnboardingCoordinator {
     }
 
     // The runtime degradation hook. The `.granted → !.granted` transition is the
-    // one that matters: it's how the M7 silent-no-op detector reaches the user
-    // even after the launch-time gate let them through. A `.denied → .granted`
+    // one that matters: it's how a revoked permission reaches the user even
+    // after the launch-time gate let them through. A `.denied → .granted`
     // transition is handled by the user re-clicking Refresh in the onboarding
     // view itself, not by this coordinator.
     private func handleStatusChange(for capability: any Capability, newStatus: CapabilityStatus) {

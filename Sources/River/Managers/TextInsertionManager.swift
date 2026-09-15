@@ -26,8 +26,7 @@ final class TextInsertionManager {
     /// never touches the clipboard, so there is no snapshot/restore and the
     /// clipboard-restore race is gone *by construction* (planning 0011). The
     /// keystrokes route through `AccessibilityCapability.postKeyEvent`, the one
-    /// `CGEvent.post` site, so the `.granted` gate and the silent-no-op probe
-    /// still apply.
+    /// `CGEvent.post` site, so the `.granted` gate still applies.
     ///
     /// Skips (throwing `TextInsertionError.noEditableTarget`) when the focused
     /// element is clearly non-editable — the insertion guard (planning 0001).
@@ -49,9 +48,8 @@ final class TextInsertionManager {
             }
             logger.info("insertText: done")
         } catch {
-            // The only throws here are `postKeyEvent`'s `.notGranted` / `.silentNoOp`,
-            // which fire on the *first* event (the gate + first-use probe) — before
-            // any character is injected. There is no clipboard to restore. Log and
+            // The only throw here is `postKeyEvent`'s `.notGranted`, which fires on
+            // the *first* event — before any character is injected. There is no clipboard to restore. Log and
             // rethrow so `RiverSession` surfaces the error.
             logger.error("insertText: failed: \(LogRedaction.redactUserPaths(error.localizedDescription), privacy: .public)")
             throw error
