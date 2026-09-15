@@ -47,6 +47,42 @@ Root cause and the durable fix, field-verified: rows created by tccd via a reque
 - **Stale-row guidance.** When a Refresh after a Grant round-trip still reads denied, onboarding should say the quiet part: "If River already appears enabled in System Settings, remove it with − and add it again" — the only working recovery until the row is tccd-owned.
 - **Pre-recording capability gate.** `handleActivate` currently gates on model-readiness but not on capability status: the app logged Accessibility as denied, re-opened onboarding, *and still accepted a 35-second dictation* that could only die at paste time. A known-denied capability must decline activation up front (the 0004 gate pattern: decline + error toast), so the user's speech is never accepted into a doomed cycle.
 
+## 5. Design principle (2026-09-14): permission status is the app's job, not the user's
+
+**Recorded during the #33 smoke; deferred with ACs 3, 4, and 6.**
+
+Every rebuild smoke in the #30–#33 review cycle produced the same sequence: launch, onboarding appears showing Accessibility "not granted," the user presses **Refresh**, it flips green. Every time.
+
+That Refresh press has no downside and no judgment in it. Its only trigger is the user seeing a status the app could have determined itself. It is a deterministic check performed by hand. Friction the app imposes on the user for its own bookkeeping.
+
+**The friction is designed in, in three specific places:**
+
+1. **The launch gate trusts a single read.** `OnboardingCoordinator.presentIfNeeded()` decides from `OnboardingGate.shouldPresent(for:)` against one launch-time status read, which on a rebuilt binary is a known false negative (see section 1's field addendum). So onboarding is shown to a user who already granted everything.
+2. **The happy-path transition is explicitly delegated to a click.** The coordinator's status hook handles only `.granted → !.granted`, and its comment states the other direction outright: *"A `.denied → .granted` transition is handled by the user re-clicking Refresh in the onboarding view itself, not by this coordinator."*
+3. **Nothing rechecks when the user comes back, and nothing dismisses.** There is no recheck on app activation — the moment a user returns from System Settings — and no path that closes onboarding once every capability reads granted.
+
+**Target behavior:**
+
+- **Trigger trust re-evaluation before deciding to present.** A user whose permissions are all valid never sees onboarding. *How* is open — see below: a time-based retry is not sufficient.
+- **Recheck automatically when it could have changed** — on app activation and on onboarding window focus, which is exactly when a user returns from granting.
+- **Dismiss onboarding the moment every capability reads granted**, so the user goes straight to dictating.
+- **The Refresh button becomes redundant.** Decide during implementation whether to remove it or keep it as a demoted fallback; either way it must stop being a required step.
+
+**Which read is actually wrong — corrected by the #33 smoke (2026-09-14).** There are two status reads, and #33's retry only covers one. At launch, `init()` reads `AXIsProcessTrusted()` alone — no probe. On Refresh, `recheck()` reads `AXIsProcessTrusted()` and runs the probe *only if it returned trusted*; #33's retry wraps that probe. On-device, a rebuilt binary showed **no change with #33**: launch still reads not-granted, and a single Refresh flips it green, exactly as before. That places the false negative on the `AXIsProcessTrusted()` read, not on the probe — which passes first time once trust reads true, so the retry never engages in this flow.
+
+**What actually clears it is unresolved — two observations disagree.**
+
+- *#33 smoke (2026-09-14):* the maintainer pressed Grant, found River already toggled on in System Settings, touched nothing, came back, pressed Refresh → green. Opening the pane looked like the one required action.
+- *#34–#36 smoke, same day:* on the next rebuild a Sparkle startup alert appeared first; after dismissing it the maintainer pressed Refresh **without** opening System Settings → green on one click.
+
+The two are confounded by **elapsed time**. Opening System Settings takes several seconds, and so did dealing with the alert. The likeliest shared factor is that `AXIsProcessTrusted()` is false for a freshly installed binary for a short window and then flips on its own, with the pane playing no causal role — but one observation each way does not settle it.
+
+**The test that settles it**, run on any rebuild: launch, do nothing for about 30 seconds, then press Refresh. Green means it's time-based; still denied means something like opening the pane is required.
+
+Consequence for the design, either way: auto-recheck (AC8) is right and removes the Refresh press. **If time-based**, a delayed or repeated recheck of the trust read after launch should make rebuilds genuinely zero-touch. **If pane-triggered**, rechecking alone won't do it, and the candidate is AC4's request API, `AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt: true])` — unverified; whether it re-evaluates an existing entry silently or raises the system prompt decides whether it removes the friction or merely moves it. #33's probe retry covers neither case, since it only runs after the trust read already says trusted.
+
+**What auto-recheck cannot fix:** the stale row (section 4). There, "denied" is the *correct* reading — tccd genuinely does not authorize the running binary — so no amount of rechecking helps, and AC6's recovery guidance is still required. Zero-touch removes the friction from the case where the app was simply wrong about the state; it does not replace guidance for the case where the state is genuinely broken.
+
 ## Acceptance criteria
 
 1. Toggling Accessibility on reflects as "granted" on the first Refresh (or after the prescribed relaunch) without repeated clicks — **and** a genuinely silent-no-op bundle still downgrades to denied.
@@ -55,6 +91,8 @@ Root cause and the durable fix, field-verified: rows created by tccd via a reque
 4. Granting Accessibility/Input Monitoring goes through the request APIs: the row is tccd-created, survives a same-identity rebuild, and after the Grant round-trip the onboarding window is re-fronted with a fresh status check (no user-discovered Refresh required).
 5. With any required capability known-denied, activation is declined with clear feedback before audio capture starts — no dictation is accepted into a cycle that cannot paste.
 6. A persistent post-grant denied status surfaces the stale-row recovery guidance (remove and re-add), not a bare "not granted."
+7. A user whose required capabilities are all valid never sees onboarding at launch, including on the first launch of a rebuilt binary — the gate decides only after a settled recheck.
+8. No required path to a working app involves pressing Refresh: status rechecks automatically on app activation and onboarding focus, and onboarding dismisses itself once every required capability reads granted.
 
 ## Related
 
