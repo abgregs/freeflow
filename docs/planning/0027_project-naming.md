@@ -27,7 +27,7 @@ The bundle ID is the one that must never change again: macOS keys every permissi
 ## Release status
 
 - **No release exists yet.** The first River release is `v0.1.0`; `CHANGELOG.md`'s Unreleased section holds its notes, and the release is cut per [../architecture/release-pipeline.md](../architecture/release-pipeline.md) once the on-device smoke of the current build passes.
-- **Sparkle is inert until then.** `SUPublicEDKey` is a placeholder and the `SPARKLE_PRIVATE_KEY` secret is unset, so the updater never starts and the release workflow fails every tag — by design, until the keypair is generated for the first release ([0009](0009_sparkle-auto-update.md)).
+- **Sparkle is configured.** `SUPublicEDKey` holds the real public key; the private key is the `SPARKLE_PRIVATE_KEY` secret. The release workflow fails any tag while that secret is unset, so the first release cannot ship without a working updater ([0009](0009_sparkle-auto-update.md)). The first release is rehearsed with a `v0.1.0-rc1` pre-release tag.
 
 ## Related
 

@@ -56,7 +56,7 @@ test tags publish as pre-releases and are therefore invisible to Sparkle users.
 | `NOTARY_API_KEY_BASE64` | Base64 of the App Store Connect API key (`.p8`) |
 | `NOTARY_API_KEY_ID` | The API key's Key ID |
 | `NOTARY_API_ISSUER_ID` | The API key's Issuer ID |
-| `SPARKLE_PRIVATE_KEY` | Base64 EdDSA private key that signs the Sparkle appcast (planning 0009) |
+| `SPARKLE_PRIVATE_KEY` | EdDSA private key exactly as exported by `generate_keys -x` (already base64 text) that signs the Sparkle appcast (planning 0009) |
 | `TAP_BUMP_TOKEN` | Fine-grained PAT, `contents: write` on `abgregs/homebrew-river` **only** — pushes the rendered cask on each release (planning 0013) |
 
 App Store Connect API key is used over an Apple ID + app-specific password — it
@@ -85,9 +85,14 @@ no unpinned action or extra download (0005 workflow hardening).
    - Paste the printed public key into `SUPublicEDKey` in
      [`Info.plist`](../../Sources/River/Resources/Info.plist), replacing the
      `REPLACE_WITH_SPARKLE_ED_PUBLIC_KEY` placeholder.
-   - Export the private key (`generate_keys -x private-key.txt`), base64-encode
-     it (`base64 -i private-key.txt | pbcopy`), and store it as the
-     `SPARKLE_PRIVATE_KEY` secret. **Never commit the private key.**
+   - Export the private key (`generate_keys -x private-key.txt`) and store the
+     file's contents **as-is** as the `SPARKLE_PRIVATE_KEY` secret
+     (`gh secret set SPARKLE_PRIVATE_KEY < private-key.txt`). The export is
+     already base64 text and the workflow pipes the secret straight into
+     `sign_update --ed-key-file -`, so encoding it again breaks every signature.
+     Back the key up in a password manager, then delete the file: a lost key
+     means existing installs can never receive another update. **Never commit
+     the private key.**
 
    Until both are in place, builds still ship, but Sparkle updates fail signature
    verification (safe-by-default) and the appcast step fails loudly on the
