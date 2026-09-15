@@ -2,6 +2,8 @@
 
 A queued roadmap item, deferred out of M8. Pauses now-playing media (Music, Spotify, a browser video) when a recording starts and resumes it when the cycle ends, so dictation isn't fighting background audio.
 
+> **Status (2026-09-14): PR #34 closed unmerged; spec retained for a rework.** On macOS 15.4+ the private `MediaRemote` now-playing query is blocked for third-party apps (a YouTube tab kept playing in the on-device smoke), so the idempotency guard below has no reliable input. The implementation also had a pause/resume race and no timeout on the now-playing callback. Its commit was reverted out of the Sparkle PR (#35) before that merged; the branch `feat/0003-pause-media-while-dictating` is kept as the rework source.
+
 ## Problem
 
 Recording over playing audio is both annoying (the user hears their music while talking) and slightly worse for capture. The setting `pauseMediaWhileDictating` (default `true`) and its consumer `MediaPauseManager` are named in [../architecture/configuration.md](../architecture/configuration.md), but neither exists yet. M8 deliberately shipped the rest of Settings **without** this toggle rather than ship an inert control — see [current-focus.md](current-focus.md) and the no-silent-no-op rule in [../conventions/anti-patterns.md](../conventions/anti-patterns.md).

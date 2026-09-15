@@ -8,8 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-06-22
-
 First public release — a macOS menu bar dictation app with fully on-device transcription.
 
 ### Added
@@ -25,5 +23,4 @@ First public release — a macOS menu bar dictation app with fully on-device tra
 - Menu bar status that tracks the cycle (Ready → Recording → Processing) and surfaces errors.
 - Signed and notarized `.dmg`, plus a Homebrew cask (`brew install --cask abgregs/river/river`).
 
-[Unreleased]: https://github.com/abgregs/river/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/abgregs/river/releases/tag/v0.1.0
+[Unreleased]: https://github.com/abgregs/river/commits/main
