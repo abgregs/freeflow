@@ -36,9 +36,9 @@ final class UpdaterManager {
         guard controller == nil else { return }
         // Sparkle validates SUPublicEDKey on start and shows a blocking "updater
         // failed to start" alert when it is invalid. Until the real key is pasted
-        // into Info.plist — deliberately deferred until after the project rename —
-        // the plist holds a placeholder, so don't start at all: no alert, no feed
-        // requests. Starts on its own once a valid key is present.
+        // into Info.plist — deliberately deferred to the first release (planning
+        // 0027) — the plist holds a placeholder, so don't start at all: no alert,
+        // no feed requests. Starts on its own once a valid key is present.
         guard Self.isConfigured else {
             logger.info("Sparkle not started: SUPublicEDKey is missing or a placeholder")
             return
