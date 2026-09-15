@@ -484,56 +484,6 @@ struct FreeFlowSessionTests {
         #expect(env.session.currentState == .idle)
     }
 
-    // MARK: - Media pause (planning 0003)
-
-    @MainActor
-    @Test("setting off: media is never paused when recording starts (AC3)")
-    func mediaPauseSettingOffNeverPauses() async throws {
-        // AC3: toggle off → media is never touched. Even if media is playing,
-        // the session must not call pauseIfPlaying when the setting is false.
-        let env = makeSession()
-        env.store.setValue(false, for: Settings.pauseMediaWhileDictating)
-        env.mediaController.playingStub = true
-
-        env.session.handleActivate()
-        try await Task.sleep(nanoseconds: 20_000_000)
-
-        #expect(env.mediaController.pauseCount == 0)
-    }
-
-    @MainActor
-    @Test("setting on: recording start pauses playing media")
-    func mediaPauseSettingOnPausesMedia() async throws {
-        // AC1 (session integration): the session gates the call and the manager
-        // pauses when media is playing. Decision logic is in MediaPauseManagerTests;
-        // this confirms the session wires the call correctly.
-        let env = makeSession()
-        env.store.setValue(true, for: Settings.pauseMediaWhileDictating)
-        env.mediaController.playingStub = true
-
-        env.session.handleActivate()
-        try await Task.sleep(nanoseconds: 20_000_000)
-
-        #expect(env.mediaController.pauseCount == 1)
-    }
-
-    @MainActor
-    @Test("canceled recording resumes paused media (AGENTS.md 0017 + 0003)")
-    func cancelPathResumesMedia() async throws {
-        // AGENTS.md: a canceled recording must also resume paused media. The
-        // cancel path (handleCancel) runs resumeIfPaused, mirroring handleDeactivate.
-        let env = makeSession()
-        env.store.setValue(true, for: Settings.pauseMediaWhileDictating)
-        env.mediaController.playingStub = true
-
-        env.session.handleActivate()
-        try await Task.sleep(nanoseconds: 20_000_000)  // let pauseIfPlaying task run
-        #expect(env.mediaController.pauseCount == 1)
-
-        env.session.handleCancel()
-        #expect(env.mediaController.playCount == 1)
-    }
-
     // MARK: - Test environment
 
     @MainActor
@@ -622,7 +572,6 @@ struct FreeFlowSessionTests {
         let microphone: MicrophoneCapability
         let transcription: TranscriptionManager
         let accessibility: AccessibilityCapability
-        let mediaController: FakeMediaController
     }
 
     @MainActor
@@ -647,7 +596,6 @@ struct FreeFlowSessionTests {
         // session's apply-or-defer routing without a real WhisperKit download.
         transcription.setModelLoadStateForTesting(.ready)
         transcription.skipLoadForTesting = true
-        let mediaController = FakeMediaController()
         let session = FreeFlowSession(
             accessibility: accessibility,
             microphone: microphone,
@@ -656,7 +604,6 @@ struct FreeFlowSessionTests {
             audio: AudioCaptureManager(microphone: microphone),
             textInsertion: TextInsertionManager(accessibility: accessibility),
             transcription: transcription,
-            mediaPause: MediaPauseManager(controller: mediaController),
             settings: store
         )
         return TestEnv(
@@ -666,8 +613,7 @@ struct FreeFlowSessionTests {
             inputMonitoring: inputMonitoring,
             microphone: microphone,
             transcription: transcription,
-            accessibility: accessibility,
-            mediaController: mediaController
+            accessibility: accessibility
         )
     }
 
