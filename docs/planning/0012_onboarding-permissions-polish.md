@@ -12,7 +12,9 @@ Two related rough edges in the first-run permissions flow, surfaced during the p
 
 The reliable path today is the relaunch the onboarding copy already prescribes.
 
-**Proposed fix.** On a probe failure that occurs *right after* `AXIsProcessTrusted()` reports trusted, **retry the probe once or twice with a short settle delay before downgrading**, and consider surfacing "couldn't confirm" (`.unknown`) rather than "not granted" (`.denied`) on a transient failure. Must **preserve the genuine silent-no-op detection** ([anti-patterns.md](../conventions/anti-patterns.md) #3): a *persistent* failure still downgrades to `.denied`; only the just-granted transient is forgiven.
+> **Superseded 2026-09-15 by section 6.** The probe race named above was the whole cause of the launch-time false negative, the retry below could not fix it, and the probe is removed.
+
+**Proposed fix (as originally written).** On a probe failure that occurs *right after* `AXIsProcessTrusted()` reports trusted, **retry the probe once or twice with a short settle delay before downgrading**, and consider surfacing "couldn't confirm" (`.unknown`) rather than "not granted" (`.denied`) on a transient failure. Must **preserve the genuine silent-no-op detection** ([anti-patterns.md](../conventions/anti-patterns.md) #3): a *persistent* failure still downgrades to `.denied`; only the just-granted transient is forgiven.
 
 **Field addendum (2026-08-19):** the same false-negative shape appears on every *first launch of a freshly rebuilt binary* — status reads denied at launch, and a Grant-roundtrip + Refresh flips it green with no TCC changes (the pane row was valid throughout; see [../architecture/distribution.md](../architecture/distribution.md)). The implementation should instrument whether `AXIsProcessTrusted()` or the probe is the false-negative source; either way, the settle-retry (plus item 4's post-Grant auto-recheck) is what turns dev rebuilds — and any user's stale-status launch — into a zero-touch experience.
 
@@ -68,6 +70,8 @@ That Refresh press has no downside and no judgment in it. Its only trigger is th
 - **Dismiss onboarding the moment every capability reads granted**, so the user goes straight to dictating.
 - **The Refresh button becomes redundant.** Decide during implementation whether to remove it or keep it as a demoted fallback; either way it must stop being a required step.
 
+> **Superseded 2026-09-15 by section 6.** The logs show the opposite of the conclusion below: the trust read was right every time, and the probe was wrong.
+
 **Which read is actually wrong — corrected by the #33 smoke (2026-09-14).** There are two status reads, and #33's retry only covers one. At launch, `init()` reads `AXIsProcessTrusted()` alone — no probe. On Refresh, `recheck()` reads `AXIsProcessTrusted()` and runs the probe *only if it returned trusted*; #33's retry wraps that probe. On-device, a rebuilt binary showed **no change with #33**: launch still reads not-granted, and a single Refresh flips it green, exactly as before. That places the false negative on the `AXIsProcessTrusted()` read, not on the probe — which passes first time once trust reads true, so the retry never engages in this flow.
 
 **What actually clears it is unresolved — two observations disagree.**
@@ -83,9 +87,34 @@ Consequence for the design, either way: auto-recheck (AC8) is right and removes 
 
 **What auto-recheck cannot fix:** the stale row (section 4). There, "denied" is the *correct* reading — tccd genuinely does not authorize the running binary — so no amount of rechecking helps, and AC6's recovery guidance is still required. Zero-touch removes the friction from the case where the app was simply wrong about the state; it does not replace guidance for the case where the state is genuinely broken.
 
+## 6. Diagnosis (2026-09-15): the launch-time "not granted" was our own probe
+
+**Observed.** On a River dev build, every launch showed Accessibility red in onboarding, not only the first launch after a rebuild. Quitting and relaunching the same install reproduced it each time. Waiting a few seconds and pressing Refresh, with no trip to System Settings, sometimes turned it green.
+
+**Evidence.** The capability's own logs across that session's relaunches:
+
+| Read | Result |
+|---|---|
+| `AXIsProcessTrusted()` | granted on every launch and every Refresh |
+| Delivery probe | failed 15 times, passed twice |
+| Onboarding shown red | only ever after a probe failure, via the `.granted → .denied` regression hook |
+
+Every downgrade logged "OS reported granted but synthesized modifier was not observed". The trust read never returned false.
+
+**Cause.** The probe posted a Shift key-down to `.cghidEventTap` and read `CGEventSource.flagsState(.combinedSessionState)` on the next line. `CGEvent.post` is asynchronous: the event reaches the window server's modifier state later, so the read-back usually saw nothing. PR #33's retry put its settle delay *between* attempts, not between each post and its read, so every attempt raced identically. Refresh "working after a wait" was a retry that happened to lose the race the other way. Section 1 named this race in June; section 5 then misattributed the symptom to the trust read by inference, without the logs.
+
+**Decision.** Remove the probe (planning 0012, maintainer decision). Accessibility status is `AXIsProcessTrusted()` alone, on launch, on Refresh, and before the first paste. Rejected alternatives:
+
+- *A longer or smarter settle delay:* any fixed wait is a guess about system scheduling, not a completion signal.
+- *Observe the tagged event arriving at our own listen-only event tap:* a real completion signal, but it couples the Accessibility check to Input Monitoring being granted and adds the most code to the most sensitive path, to guard a failure that is already stopped at build time.
+
+**What still guards anti-pattern #3.** A bundle signed without its `Info.plist` is caught by `make verify`, which asserts `Identifier=com.river.app` on the signed bundle in both `make install` and the release workflow. `AGENTS.md` rule 2 and anti-patterns #3 were updated to say so.
+
+**Effect on the acceptance criteria.** AC7's launch case is met for a user whose grant is valid: onboarding no longer appears. AC1's "silent-no-op bundle still downgrades" clause is withdrawn with the probe. AC8 stays open: rechecking on app activation and window focus is still the right behavior for the return-from-System-Settings case, and whether `AXIsProcessTrusted()` lags a just-granted permission in a running process (section 1's other hypothesis) is unverified.
+
 ## Acceptance criteria
 
-1. Toggling Accessibility on reflects as "granted" on the first Refresh (or after the prescribed relaunch) without repeated clicks — **and** a genuinely silent-no-op bundle still downgrades to denied.
+1. Toggling Accessibility on reflects as "granted" on the first Refresh (or after the prescribed relaunch) without repeated clicks. (The original second clause, that a silent-no-op bundle still downgrades to denied, was withdrawn with the probe; see section 6.)
 2. The user can re-open the permissions view at any time from the menu bar, without relaunching.
 3. Relaunch guidance reads as the expected step, not a last resort.
 4. Granting Accessibility/Input Monitoring goes through the request APIs: the row is tccd-created, survives a same-identity rebuild, and after the Grant round-trip the onboarding window is re-fronted with a fresh status check (no user-discovered Refresh required).
@@ -96,7 +125,7 @@ Consequence for the design, either way: auto-recheck (AC8) is right and removes 
 
 ## Related
 
-- [../architecture/capabilities.md](../architecture/capabilities.md) — `recheck()` and the silent-no-op `probe()` this tunes
+- [../architecture/capabilities.md](../architecture/capabilities.md) — `recheck()`, and why bundle misidentification is a build-time check this tunes
 - [../architecture/permissions.md](../architecture/permissions.md) — the TCC grant story and why some grants need a relaunch
 - [../architecture/app-state-and-menu-bar.md](../architecture/app-state-and-menu-bar.md) — the menu bar, where a "Permissions…" item would live
-- [../conventions/anti-patterns.md](../conventions/anti-patterns.md) — #3 (silent-no-op), which the probe must keep detecting
+- [../conventions/anti-patterns.md](../conventions/anti-patterns.md) — #3 (bundle misidentification), now enforced at build time rather than by a runtime probe
